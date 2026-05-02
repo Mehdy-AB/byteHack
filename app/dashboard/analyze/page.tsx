@@ -26,8 +26,11 @@ interface AnalyzeResponse {
   workflow: any
 }
 
-const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-card border border-border rounded-xl overflow-hidden ${className}`} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
+const Card = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => (
+  <div 
+    className={`bg-card border border-border rounded-xl overflow-hidden ${className}`} 
+    style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', ...style }}
+  >
     {children}
   </div>
 )
