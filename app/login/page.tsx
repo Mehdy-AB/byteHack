@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -18,7 +17,7 @@ export default function LoginPage() {
     setError(null)
     const result = await signIn('credentials', { email, password, redirect: false })
     if (result?.error) {
-      setError('Invalid email or password.')
+      toast.error('Invalid email or password.')
       setLoading(false)
       return
     }

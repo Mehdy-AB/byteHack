@@ -18,12 +18,12 @@ export async function POST(request: Request) {
 
   try {
     const json = await request.json()
-    
+
     const parsed = WorkflowPayloadSchema.safeParse(json)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid workflow payload', details: parsed.error.format() }, { status: 400 })
     }
-    
+
     const payload = parsed.data
     const supabase = await createClient()
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         step_type: step.type,
         status: 'PENDING',
         assigned_role: step.assignedRole || null,
-        result: step 
+        result: step
       }))
 
       const { error: stepsError } = await supabase
