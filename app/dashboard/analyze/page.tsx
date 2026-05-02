@@ -270,16 +270,45 @@ export default function AIAnalyzerPage() {
                   <div className="h-full animate-in fade-in zoom-in-95 duration-200">
                     <div className="flex items-center justify-between mb-4">
                       <div className="text-xs font-mono text-muted-foreground">GENERATED_RESPONSE_PLAN.json</div>
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(result.workflow, null, 2))
-                          toast.success('Workflow copied to clipboard')
-                        }}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-muted hover:bg-border px-3 py-1 rounded transition-colors"
-                        style={{ background: 'var(--color-muted)' }}
-                      >
-                        Copy JSON
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={async () => {
+                            const ok = confirm('Initialize this incident and execute the workflow?')
+                            if (!ok) return
+                            
+                            toast.loading('Initializing workflow...', { id: 'exec' })
+                            try {
+                              const res = await fetch('/api/analyze/execute', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(result.workflow),
+                              })
+                              const d = await res.json()
+                              if (!res.ok) throw new Error(d.error || 'Execution failed')
+                              
+                              toast.success('Incident Created & Workflow Started!', { id: 'exec' })
+                              // Optionally redirect or show incident link
+                            } catch (err: any) {
+                              toast.error(err.message, { id: 'exec' })
+                            }
+                          }}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary hover:bg-primary/30 px-3 py-1 rounded transition-colors flex items-center gap-1.5"
+                          style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)', color: 'var(--color-primary)' }}
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          Execute Workflow
+                        </button>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(JSON.stringify(result.workflow, null, 2))
+                            toast.success('Workflow copied to clipboard')
+                          }}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-muted hover:bg-border px-3 py-1 rounded transition-colors"
+                          style={{ background: 'var(--color-muted)' }}
+                        >
+                          Copy JSON
+                        </button>
+                      </div>
                     </div>
                     <pre className="p-4 rounded-lg bg-black text-[#50fa7b] font-mono text-xs overflow-x-auto border border-[#50fa7b]/20 leading-relaxed max-h-[500px]"
                       style={{ background: '#000', color: '#50fa7b', borderColor: 'rgba(80, 250, 123, 0.2)' }}>
