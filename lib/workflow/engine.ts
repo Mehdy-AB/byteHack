@@ -18,7 +18,7 @@ async function notifyStepAssignee(
   const assignedUser = step.result?.assignedUser || step.assigned_user
   const assignedRole = step.result?.assignedRole || step.assigned_role
   const subject = `[SF SOAR] Task Assigned: ${step.step_type.replace(/_/g, ' ')}`
-  const body = `You have a new ${step.step_type} task for incident "${incidentTitle}" (ID: ${incidentId}). ${step.result?.message || 'Please review in your SOAR dashboard.'}`
+  const body = `You have a new ${step.step_type} task for incident "${incidentTitle}" (ID: ${incidentId}). ${step.result?.catalogue || step.result?.message || 'Please review in your SOAR dashboard.'}`
 
   if (assignedUser) {
     const { data: profile } = await supabase
@@ -85,7 +85,7 @@ export async function processWorkflowSteps(incidentId: string) {
         }
       }
 
-      console.log(`Processing step ${step.step_order || '?'}: ${step.step_type} for incident ${incidentId}`)
+      console.log(`Processing step ${step.step_order || '?'}: ${payload.catalogue || step.step_type} for incident ${incidentId}`)
       await supabase
         .from('incident_steps')
         .update({ status: 'RUNNING', started_at: new Date().toISOString() })
