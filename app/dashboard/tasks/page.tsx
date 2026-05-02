@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { SeverityBadge, StatusBadge } from '@/components/badges'
 import { approveStep, rejectStep, reportStep } from '@/lib/actions/steps'
-import { RotateCcw, CheckCircle2, XCircle, MessageSquare, ChevronDown, Clock } from 'lucide-react'
+import { RotateCcw, CheckCircle2, XCircle, MessageSquare, ChevronDown, Clock, Sparkles } from 'lucide-react'
+import { AIHelpPanel, type Task } from '@/components/dashboard/AIHelpPanel'
 
 function relativeTime(s: string) {
   const diff = Math.floor((Date.now() - new Date(s).getTime()) / 1000)
@@ -21,20 +22,7 @@ function countdownText(expiresAt: string): string {
   return `${Math.floor(diff / 86400)}d remaining`
 }
 
-interface Task {
-  id: string
-  incident_id: string
-  incident_title: string
-  type: string
-  status: string
-  assigned_role: string | null
-  message: string | null
-  context: { severity: string; source: string; playbook_id?: string; ai_confidence?: number }
-  requested_at: string
-  sla_expires_at: string | null
-}
-
-function TaskCard({ task, onAction }: { task: Task; onAction: () => void }) {
+function TaskCard({ task, onAction, onAIHelp }: { task: Task; onAction: () => void; onAIHelp: (task: Task) => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [showNotes, setShowNotes] = useState(false)
@@ -49,7 +37,12 @@ function TaskCard({ task, onAction }: { task: Task; onAction: () => void }) {
 
   async function act(fn: () => Promise<void>, key: string) {
     setBusy(key); setFeedback(null)
-    try { await fn(); setFeedback({ type: 'ok', msg: `${key} successful` }); onAction() }
+    try {
+      await fn()
+      setFeedback({ type: 'ok', msg: `${key} successful` })
+      onAction()
+      window.dispatchEvent(new CustomEvent('sf:task-resolved'))
+    }
     catch (e: any) { setFeedback({ type: 'err', msg: e.message || 'Failed' }) }
     finally { setBusy(null) }
   }
@@ -127,6 +120,18 @@ function TaskCard({ task, onAction }: { task: Task; onAction: () => void }) {
           <Clock className="h-3.5 w-3.5" />
           {countdownText(task.sla_expires_at)}
         </div>
+      )}
+
+      {/* AI Help */}
+      {!isDone && (
+        <button
+          onClick={() => onAIHelp(task)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold w-full transition-colors"
+          style={{ background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in oklab, var(--color-primary) 25%, transparent)' }}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI Assistance
+        </button>
       )}
 
       {/* History toggle */}
@@ -218,6 +223,7 @@ export default function TasksPage() {
   const [severity, setSeverity] = useState('')
   const [sortBy, setSortBy] = useState('requested_at')
   const [order, setOrder] = useState('desc')
+  const [aiTask, setAiTask] = useState<Task | null>(null)
 
   async function fetchTasks() {
     setLoading(true); setError(null)
@@ -236,8 +242,8 @@ export default function TasksPage() {
 
   useEffect(() => { fetchTasks() }, [status, severity, sortBy, order])
 
-  return (
-    <div>
+  const taskList = (
+    <>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">My Tasks</h1>
@@ -284,10 +290,16 @@ export default function TasksPage() {
           <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>All caught up — no approval requests.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          {tasks.map(task => <TaskCard key={task.id} task={task} onAction={fetchTasks} />)}
+        <div className={`gap-5 ${aiTask ? 'flex flex-col' : 'grid grid-cols-1 xl:grid-cols-2'}`}>
+          {tasks.map(task => <TaskCard key={task.id} task={task} onAction={fetchTasks} onAIHelp={setAiTask} />)}
         </div>
       )}
-    </div>
+    </>
   )
+
+  if (aiTask) {
+    return <AIHelpPanel task={aiTask} onClose={() => setAiTask(null)} />
+  }
+
+  return <div>{taskList}</div>
 }

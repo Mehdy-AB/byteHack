@@ -52,6 +52,14 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
     fetchCount()
 
+    // Immediate drop when task is approved/rejected on the tasks page
+    function onTaskResolved() {
+      setTaskCount(c => Math.max(0, c - 1))
+      // Re-sync with server after a short delay
+      setTimeout(fetchCount, 1500)
+    }
+    window.addEventListener('sf:task-resolved', onTaskResolved)
+
     const supabase = createClient()
     const channel = supabase
       .channel('sidebar-task-count')
@@ -62,7 +70,10 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      window.removeEventListener('sf:task-resolved', onTaskResolved)
+      supabase.removeChannel(channel)
+    }
   }, [profile.role])
 
   const navItems = [
