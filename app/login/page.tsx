@@ -1,23 +1,41 @@
 'use client'
 
-import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { Shield, Loader2 } from 'lucide-react'
-import { toast } from 'react-hot-toast'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { Shield, Loader2, AlertCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      if (errorParam === 'CredentialsSignin') {
+        setError('Invalid email or password.')
+      } else if (errorParam === 'SessionRequired') {
+        setError('Please sign in to access this page.')
+      } else {
+        setError('Authentication failed. Please try again.')
+      }
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setError(null)
     const result = await signIn('credentials', { email, password, redirect: false })
     if (result?.error) {
-      toast.error('Invalid email or password.')
+      const message = result.error === 'CredentialsSignin' ? 'Invalid email or password.' : 'An error occurred during sign in.'
+      setError(message)
+      toast.error(message)
       setLoading(false)
       return
     }
@@ -65,6 +83,20 @@ export default function LoginPage() {
         >
           <h2 className="text-lg font-semibold mb-1">Sign In</h2>
           <p className="text-xs mb-6" style={{ color: 'var(--color-muted-foreground)' }}>Access your SOAR dashboard</p>
+
+          {error && (
+            <div 
+              className="mb-4 p-3 rounded-lg text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-1"
+              style={{ 
+                background: 'color-mix(in oklab, var(--color-destructive) 10%, transparent)',
+                border: '1px solid color-mix(in oklab, var(--color-destructive) 20%, transparent)',
+                color: 'var(--color-destructive)'
+              }}
+            >
+              <AlertCircle className="h-3.5 w-3.5" />
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -124,5 +156,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--color-background)' }}>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

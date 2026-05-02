@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel, Cpu, AlertTriangle } from 'lucide-react'
 
 interface Profile {
   name: string | null
@@ -72,6 +72,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     ...(['ADMIN', 'CISO', 'LEGAL'].includes(profile.role)
       ? [{ label: 'Compliance', href: '/dashboard/compliance', icon: <Gavel className="w-4 h-4" />, badge: null }]
       : []),
+    { label: 'AI Analyzer', href: '/dashboard/analyze', icon: <Cpu className="w-4 h-4" /> },
     { label: 'Settings', href: '/dashboard/settings', icon: <Settings className="w-4 h-4" /> },
   ]
 
