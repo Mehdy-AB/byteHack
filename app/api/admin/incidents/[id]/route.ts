@@ -33,15 +33,19 @@ export async function GET(
 
     const { data: steps } = await supabase
       .from('incident_steps')
-      .select('*')
+      .select('*, profiles:assigned_user(id, name, email)')
       .eq('incident_id', id)
       .order('created_at', { ascending: true })
 
-    const { data: auditLog } = await supabase
+    const { data: auditLog, error: auditError } = await supabase
       .from('audit_log')
-      .select('id, actor, action, status, compliance, row_hash, created_at')
+      .select('id, actor, action, status, row_hash, created_at')
       .eq('incident_id', id)
       .order('created_at', { ascending: true })
+
+    if (auditError) {
+      console.error('Audit Log Fetch Error:', auditError)
+    }
 
     const assignedTo = incident.profiles || incident.assigned_to
 
@@ -58,6 +62,8 @@ export async function GET(
         step_order: step.step_order,
         status: step.status,
         assigned_role: step.assigned_role,
+        assigned_user_name: step.profiles?.name || null,
+        assigned_user_email: step.profiles?.email || null,
         message: step.result?.message || null,
         result: step.result,
         started_at: step.started_at,

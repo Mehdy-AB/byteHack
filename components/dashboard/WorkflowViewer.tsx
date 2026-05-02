@@ -16,7 +16,9 @@ interface Step {
   step_type: string
   step_order: number
   status: string
-  result: Record<string, unknown> | null
+  result: Record<string, any> | null
+  assigned_user_name?: string | null
+  assigned_user_email?: string | null
   created_at: string
 }
 
@@ -173,10 +175,17 @@ export function WorkflowViewer({ incidentId }: Props) {
                       )}
 
                       <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px dashed color-mix(in oklab, var(--border) 80%, transparent)' }}>
-                        <div className="text-[10px] font-medium" style={{ color: 'var(--color-muted-foreground)' }}>
-                          {typeof step.result?.assignedRole === 'string' ? step.result.assignedRole.replace(/_/g, ' ') : 'System Auto'}
+                        <div className="flex flex-col">
+                          <div className="text-[10px] font-bold" style={{ color: 'var(--color-foreground)' }}>
+                            {step.assigned_user_name || (typeof step.result?.assignedRole === 'string' ? step.result.assignedRole.replace(/_/g, ' ') : 'System Auto')}
+                          </div>
+                          {step.assigned_user_email && (
+                            <div className="text-[9px] opacity-70" style={{ color: 'var(--color-muted-foreground)' }}>
+                              {step.assigned_user_email}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-[10px] font-mono" style={{ color: 'var(--color-muted-foreground)' }}>
+                        <div className="text-[10px] font-mono self-end" style={{ color: 'var(--color-muted-foreground)' }}>
                           {relativeTime(step.created_at)}
                         </div>
                       </div>

@@ -16,7 +16,8 @@ interface AuditEntry {
   action: string
   performed_by: string | null
   reason: string | null
-  metadata: Record<string, unknown> | null
+  status: string | null
+  metadata: Record<string, any> | null
   created_at: string
 }
 
@@ -34,6 +35,15 @@ const KIND_META: Record<EventKind, { icon: React.ComponentType<{ className?: str
   workflow: { icon: Sparkles, color: 'var(--color-primary)', label: 'Workflow' },
   assigned: { icon: Users, color: 'var(--status-progress)', label: 'Assignment' },
   update: { icon: Activity, color: 'var(--status-done)', label: 'Update' },
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  SUCCESS: 'var(--status-done)',
+  COMPLETED: 'var(--status-done)',
+  FAILED: 'var(--severity-critical)',
+  WAITING_APPROVAL: 'var(--severity-medium)',
+  RUNNING: 'var(--color-primary)',
+  PENDING: 'var(--color-muted-foreground)',
 }
 
 interface Props {
@@ -57,6 +67,7 @@ export function AuditTimeline({ incidentId }: Props) {
         const auditEvents: AuditEntry[] = auditLog.map((e: any) => ({
           id: `audit-${e.id}`,
           action: e.action,
+          status: e.status || null,
           performed_by: e.profiles?.name || e.actor || null,
           reason: e.reason || null,
           metadata: e.metadata || null,
@@ -65,7 +76,8 @@ export function AuditTimeline({ incidentId }: Props) {
 
         const stepEvents: AuditEntry[] = steps.map((s: any) => ({
           id: `step-${s.id}`,
-          action: `STEP_${s.status}: ${s.step_type.replace(/_/g, ' ')}`,
+          action: s.step_type.replace(/_/g, ' '),
+          status: s.status,
           performed_by: s.assigned_role ? s.assigned_role.replace(/_/g, ' ') : 'System',
           reason: s.message || null,
           metadata: null,
@@ -166,12 +178,31 @@ export function AuditTimeline({ incidentId }: Props) {
                           {relativeTime(entry.created_at)}
                         </span>
                       </div>
-                      <div className="text-xs mt-0.5" style={{ color: 'color-mix(in oklab, var(--foreground) 90%, transparent)' }}>
-                        {entry.action.replace(/_/g, ' ')}
-                        {entry.reason ? ` — ${entry.reason}` : ''}
+                      <div className="text-xs mt-1 flex flex-wrap items-center gap-2">
+                        {entry.status && (
+                          <span 
+                            className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter shrink-0"
+                            style={{ 
+                              background: `color-mix(in oklab, ${STATUS_COLORS[entry.status] || 'var(--border)'} 15%, transparent)`,
+                              color: STATUS_COLORS[entry.status] || 'var(--muted-foreground)',
+                              border: `1px solid color-mix(in oklab, ${STATUS_COLORS[entry.status] || 'var(--border)'} 30%, transparent)`
+                            }}
+                          >
+                            {entry.status.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        <span className="font-medium" style={{ color: 'var(--foreground)', wordBreak: 'break-word' }}>
+                          {entry.action.replace(/_/g, ' ')}
+                        </span>
+                        {entry.reason && (
+                          <span style={{ color: 'var(--color-muted-foreground)' }}>
+                            — {entry.reason}
+                          </span>
+                        )}
                       </div>
                       {entry.performed_by && (
-                        <div className="text-[11px] font-mono mt-0.5" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 70%, transparent)' }}>
+                        <div className="text-[11px] font-mono mt-1 opacity-60 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
                           {entry.performed_by}
                         </div>
                       )}
