@@ -1,36 +1,51 @@
+const SEV_STYLES: Record<string, React.CSSProperties> = {
+  CRITICAL: { background: 'color-mix(in oklab, var(--severity-critical) 15%, transparent)', color: 'var(--severity-critical)', border: '1px solid color-mix(in oklab, var(--severity-critical) 30%, transparent)' },
+  HIGH: { background: 'color-mix(in oklab, var(--severity-high) 15%, transparent)', color: 'var(--severity-high)', border: '1px solid color-mix(in oklab, var(--severity-high) 30%, transparent)' },
+  MEDIUM: { background: 'color-mix(in oklab, var(--severity-medium) 15%, transparent)', color: 'var(--severity-medium)', border: '1px solid color-mix(in oklab, var(--severity-medium) 30%, transparent)' },
+  LOW: { background: 'color-mix(in oklab, var(--severity-low) 15%, transparent)', color: 'var(--severity-low)', border: '1px solid color-mix(in oklab, var(--severity-low) 30%, transparent)' },
+}
+
+const STATUS_STYLES: Record<string, React.CSSProperties> = {
+  OPEN: { background: 'color-mix(in oklab, var(--severity-high) 12%, transparent)', color: 'var(--severity-high)', border: '1px solid color-mix(in oklab, var(--severity-high) 25%, transparent)' },
+  CONTAINED: { background: 'color-mix(in oklab, var(--severity-medium) 12%, transparent)', color: 'var(--severity-medium)', border: '1px solid color-mix(in oklab, var(--severity-medium) 25%, transparent)' },
+  RESOLVED: { background: 'color-mix(in oklab, var(--status-done) 12%, transparent)', color: 'var(--status-done)', border: '1px solid color-mix(in oklab, var(--status-done) 25%, transparent)' },
+  CLOSED: { background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' },
+  SUSPENDED: { background: 'color-mix(in oklab, var(--severity-medium) 12%, transparent)', color: 'var(--severity-medium)', border: '1px solid color-mix(in oklab, var(--severity-medium) 25%, transparent)' },
+  WAITING_APPROVAL: { background: 'color-mix(in oklab, var(--severity-medium) 15%, transparent)', color: 'var(--severity-medium)', border: '1px solid color-mix(in oklab, var(--severity-medium) 30%, transparent)' },
+  FAILED: { background: 'color-mix(in oklab, var(--severity-critical) 12%, transparent)', color: 'var(--severity-critical)', border: '1px solid color-mix(in oklab, var(--severity-critical) 25%, transparent)' },
+  SUCCESS: { background: 'color-mix(in oklab, var(--status-done) 12%, transparent)', color: 'var(--status-done)', border: '1px solid color-mix(in oklab, var(--status-done) 25%, transparent)' },
+  APPROVED: { background: 'color-mix(in oklab, var(--status-done) 12%, transparent)', color: 'var(--status-done)', border: '1px solid color-mix(in oklab, var(--status-done) 25%, transparent)' },
+  PENDING: { background: 'color-mix(in oklab, var(--status-pending) 12%, transparent)', color: 'var(--status-pending)', border: '1px solid color-mix(in oklab, var(--status-pending) 25%, transparent)' },
+  RUNNING: { background: 'color-mix(in oklab, var(--primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in oklab, var(--primary) 25%, transparent)' },
+  SKIPPED: { background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' },
+  ARCHIVED: { background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' },
+}
+
+const DEFAULT_STYLE: React.CSSProperties = {
+  background: 'color-mix(in oklab, var(--muted) 40%, transparent)',
+  color: 'var(--color-muted-foreground)',
+  border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)',
+}
+
 export function SeverityBadge({ severity }: { severity: string }) {
-  const styles: Record<string, string> = {
-    CRITICAL: 'bg-red-900/40 text-red-400 border border-red-800',
-    HIGH: 'bg-orange-900/40 text-orange-400 border border-orange-800',
-    MEDIUM: 'bg-yellow-900/40 text-yellow-400 border border-yellow-800',
-    LOW: 'bg-green-900/40 text-green-400 border border-green-800',
-  }
-  const cls = styles[severity] ?? 'bg-gray-800 text-gray-400 border border-gray-700'
+  const style = SEV_STYLES[severity] ?? DEFAULT_STYLE
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${cls}`}>
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+      style={style}
+    >
       {severity}
     </span>
   )
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    OPEN: 'bg-blue-900/40 text-blue-400 border border-blue-800',
-    CONTAINED: 'bg-purple-900/40 text-purple-400 border border-purple-800',
-    RESOLVED: 'bg-green-900/40 text-green-400 border border-green-800',
-    CLOSED: 'bg-gray-800 text-gray-400 border border-gray-700',
-    SUSPENDED: 'bg-yellow-900/40 text-yellow-400 border border-yellow-800',
-    WAITING_APPROVAL: 'bg-amber-900/40 text-amber-400 border border-amber-800',
-    FAILED: 'bg-red-900/40 text-red-400 border border-red-800',
-    SUCCESS: 'bg-emerald-900/40 text-emerald-400 border border-emerald-800',
-    PENDING: 'bg-slate-800 text-slate-400 border border-slate-700',
-    ARCHIVED: 'bg-gray-800 text-gray-500 border border-gray-700',
-    RUNNING: 'bg-cyan-900/40 text-cyan-400 border border-cyan-800',
-    SKIPPED: 'bg-gray-800 text-gray-400 border border-gray-700',
-  }
-  const cls = styles[status] ?? 'bg-gray-800 text-gray-400 border border-gray-700'
+  const style = STATUS_STYLES[status] ?? DEFAULT_STYLE
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${cls}`}>
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+      style={style}
+    >
       {status.replace(/_/g, ' ')}
     </span>
   )

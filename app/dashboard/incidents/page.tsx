@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { SeverityBadge, StatusBadge } from '@/components/badges'
+import { Search, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function relativeTime(dateStr: string): string {
-  const now = Date.now()
-  const then = new Date(dateStr).getTime()
-  const diff = Math.floor((now - then) / 1000)
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
@@ -16,18 +15,7 @@ function relativeTime(dateStr: string): string {
 
 const STATUS_OPTIONS = ['', 'OPEN', 'CONTAINED', 'RESOLVED', 'CLOSED', 'SUSPENDED']
 const SEVERITY_OPTIONS = ['', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-
-function SkeletonRow() {
-  return (
-    <tr className="border-t border-[#1f2937]">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-4 bg-[#1f2937] rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
-        </td>
-      ))}
-    </tr>
-  )
-}
+const sel: React.CSSProperties = { background: 'color-mix(in oklab, var(--muted) 40%, transparent)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', borderRadius: '0.5rem', padding: '6px 10px', fontSize: '12px' }
 
 export default function IncidentsPage() {
   const router = useRouter()
@@ -51,229 +39,124 @@ export default function IncidentsPage() {
     if (source) params.set('source', source)
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
-    params.set('sortBy', sortBy)
-    params.set('order', order)
-    params.set('page', String(page))
-    params.set('limit', '20')
-
+    params.set('sortBy', sortBy); params.set('order', order); params.set('page', String(page)); params.set('limit', '20')
     try {
       const res = await fetch(`/api/admin/incidents?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to fetch')
+      if (!res.ok) throw new Error()
       const data = await res.json()
-      setIncidents(data.incidents || [])
-      setPagination(data.pagination || { total: 0, page: 1, limit: 20 })
-    } catch {
-      setIncidents([])
-    } finally {
-      setLoading(false)
-    }
+      setIncidents(data.incidents || []); setPagination(data.pagination || { total: 0, page: 1, limit: 20 })
+    } catch { setIncidents([]) } finally { setLoading(false) }
   }, [status, severity, source, dateFrom, dateTo, sortBy, order, page])
 
-  useEffect(() => {
-    fetchIncidents()
-  }, [fetchIncidents])
-
-  function resetFilters() {
-    setStatus('')
-    setSeverity('')
-    setSource('')
-    setDateFrom('')
-    setDateTo('')
-    setSortBy('created_at')
-    setOrder('desc')
-    setPage(1)
-  }
-
+  useEffect(() => { fetchIncidents() }, [fetchIncidents])
   const totalPages = Math.ceil(pagination.total / pagination.limit)
+  const hasFilters = !!(status || severity || source || dateFrom || dateTo || sortBy !== 'created_at' || order !== 'desc')
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Incidents</h1>
-          <p className="text-[#6b7280] text-sm mt-1">
-            {pagination.total} total incident{pagination.total !== 1 ? 's' : ''}
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold">Incidents</h1>
+        <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>{pagination.total} total</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-4 mb-6 flex flex-col gap-4">
+      <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
         <div className="flex flex-wrap gap-3 items-end">
+          {[
+            { label: 'Status', value: status, set: (v: string) => { setStatus(v); setPage(1) }, opts: STATUS_OPTIONS.map(s => [s, s || 'All Statuses']) },
+            { label: 'Severity', value: severity, set: (v: string) => { setSeverity(v); setPage(1) }, opts: SEVERITY_OPTIONS.map(s => [s, s || 'All Severities']) },
+            { label: 'Sort By', value: sortBy, set: (v: string) => { setSortBy(v); setPage(1) }, opts: [['created_at','Created'],['severity_score','Severity'],['updated_at','Updated']] },
+            { label: 'Order', value: order, set: (v: string) => { setOrder(v); setPage(1) }, opts: [['desc','Descending'],['asc','Ascending']] },
+          ].map(({ label, value, set, opts }) => (
+            <div key={label} className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>{label}</label>
+              <select value={value} onChange={e => set(e.target.value)} style={sel}>
+                {opts.map(([v, l]) => <option key={v} value={v} style={{ background: 'oklch(0.18 0.025 260)' }}>{l}</option>)}
+              </select>
+            </div>
+          ))}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">Status</label>
-            <select
-              value={status}
-              onChange={e => { setStatus(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            >
-              {STATUS_OPTIONS.map(s => (
-                <option key={s} value={s}>{s || 'All Statuses'}</option>
-              ))}
-            </select>
+            <label className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>Source</label>
+            <div className="relative">
+              <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted-foreground)' }} />
+              <input type="text" placeholder="e.g. SentinelOne" value={source} onChange={e => { setSource(e.target.value); setPage(1) }}
+                style={{ ...sel, paddingLeft: '28px', minWidth: '130px' }} />
+            </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">Severity</label>
-            <select
-              value={severity}
-              onChange={e => { setSeverity(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            >
-              {SEVERITY_OPTIONS.map(s => (
-                <option key={s} value={s}>{s || 'All Severities'}</option>
-              ))}
-            </select>
+            <label className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>From</label>
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} style={sel} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">Source</label>
-            <input
-              type="text"
-              placeholder="e.g. SentinelOne"
-              value={source}
-              onChange={e => { setSource(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 w-36"
-            />
+            <label className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>To</label>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} style={sel} />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">From Date</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => { setDateFrom(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">To Date</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => { setDateTo(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            />
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-3 items-end border-t border-[#1f2937] pt-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">Sort By</label>
-            <select
-              value={sortBy}
-              onChange={e => { setSortBy(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="created_at">Created At</option>
-              <option value="severity_score">Severity Score</option>
-              <option value="updated_at">Last Updated</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#6b7280] uppercase tracking-wider font-semibold">Order</label>
-            <select
-              value={order}
-              onChange={e => { setOrder(e.target.value); setPage(1) }}
-              className="bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-          
-          {(status || severity || source || dateFrom || dateTo || sortBy !== 'created_at' || order !== 'desc') && (
-            <button
-              onClick={resetFilters}
-              className="px-4 py-2 text-sm font-medium text-[#6b7280] hover:text-white border border-[#1f2937] bg-[#0d1117] rounded-lg hover:bg-[#1f2937] transition-colors ml-auto"
-            >
-              Reset Filters
+          {hasFilters && (
+            <button onClick={() => { setStatus(''); setSeverity(''); setSource(''); setDateFrom(''); setDateTo(''); setSortBy('created_at'); setOrder('desc'); setPage(1) }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs ml-auto"
+              style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' }}>
+              <RotateCcw className="h-3 w-3" /> Reset
             </button>
           )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-[#111827] border border-[#1f2937] rounded-xl overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#0d1117] text-[#6b7280] text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 text-left font-semibold w-12">#</th>
-                <th className="px-4 py-3 text-left font-semibold">Severity</th>
-                <th className="px-4 py-3 text-left font-semibold">Title</th>
-                <th className="px-4 py-3 text-left font-semibold">Source</th>
-                <th className="px-4 py-3 text-left font-semibold">Assigned To</th>
-                <th className="px-4 py-3 text-left font-semibold">Status</th>
-                <th className="px-4 py-3 text-left font-semibold">SLA</th>
-                <th className="px-4 py-3 text-left font-semibold">Created</th>
+              <tr style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)' }}>
+                {['#', 'Severity', 'Title', 'Source', 'Assigned', 'Status', 'SLA', 'Created'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-muted-foreground)' }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid color-mix(in oklab, var(--border) 50%, transparent)' }}>
+                    {Array.from({ length: 8 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3"><div className="h-4 rounded animate-pulse" style={{ background: 'var(--color-muted)', width: '60%' }} /></td>
+                    ))}
+                  </tr>
+                ))
               ) : incidents.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <svg className="w-12 h-12 text-[#374151]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                      </svg>
-                      <p className="text-[#6b7280] font-medium">No incidents found</p>
-                      <p className="text-[#4b5563] text-xs">Try adjusting your filters</p>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan={8} className="px-4 py-16 text-center">
+                  <Search className="h-10 w-10 mx-auto mb-3" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)' }} />
+                  <p className="text-sm font-medium" style={{ color: 'var(--color-muted-foreground)' }}>No incidents found</p>
+                  <p className="text-xs mt-1" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>Try adjusting your filters</p>
+                </td></tr>
               ) : (
-                incidents.map((incident: any, idx: number) => (
-                  <tr
-                    key={incident.id}
-                    onClick={() => router.push(`/dashboard/incidents/${incident.id}`)}
-                    className="border-t border-[#1f2937] hover:bg-[#1a2234] cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3 text-[#4b5563] text-xs font-mono">
-                      {(page - 1) * pagination.limit + idx + 1}
-                    </td>
-                    <td className="px-4 py-3"><SeverityBadge severity={incident.severity} /></td>
-                    <td className="px-4 py-3 max-w-[200px]">
-                      <span className="text-white font-medium truncate block">{incident.raw_input?.title || 'Untitled'}</span>
-                    </td>
-                    <td className="px-4 py-3 text-[#9ca3af]">{incident.source || '—'}</td>
-                    <td className="px-4 py-3 text-[#9ca3af]">{incident.assigned_to ? incident.assigned_to.name || 'Assigned' : 'Unassigned'}</td>
-                    <td className="px-4 py-3"><StatusBadge status={incident.status} /></td>
-                    <td className="px-4 py-3">
-                      {incident.sla_breached
-                        ? <span className="text-red-400 text-xs font-semibold">Breached</span>
-                        : <span className="text-[#4b5563] text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-[#6b7280] text-xs">{relativeTime(incident.created_at)}</td>
+                incidents.map((inc: any, idx: number) => (
+                  <tr key={inc.id} onClick={() => router.push(`/dashboard/incidents/${inc.id}`)} className="cursor-pointer transition-colors"
+                    style={{ borderTop: '1px solid color-mix(in oklab, var(--border) 50%, transparent)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in oklab, var(--accent) 50%, transparent)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                    <td className="px-4 py-3 text-[11px] font-mono" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>{(page - 1) * 20 + idx + 1}</td>
+                    <td className="px-4 py-3"><SeverityBadge severity={inc.severity} /></td>
+                    <td className="px-4 py-3 max-w-[200px]"><span className="font-medium truncate block text-xs">{inc.raw_input?.title || 'Untitled'}</span></td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-muted-foreground)' }}>{inc.source || '—'}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-muted-foreground)' }}>{inc.profiles?.name || (inc.assigned_to ? 'Assigned' : 'Unassigned')}</td>
+                    <td className="px-4 py-3"><StatusBadge status={inc.status} /></td>
+                    <td className="px-4 py-3">{inc.sla_breached ? <span className="text-[11px] font-semibold" style={{ color: 'var(--severity-critical)' }}>Breached</span> : <span className="text-[11px]" style={{ color: 'var(--color-muted-foreground)' }}>—</span>}</td>
+                    <td className="px-4 py-3 text-[11px]" style={{ color: 'var(--color-muted-foreground)' }}>{relativeTime(inc.created_at)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-
-        {/* Pagination */}
         {!loading && incidents.length > 0 && (
-          <div className="px-4 py-3 border-t border-[#1f2937] flex items-center justify-between">
-            <p className="text-xs text-[#6b7280]">
-              Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 text-xs bg-[#0d1117] border border-[#1f2937] rounded-lg text-[#9ca3af] hover:text-white hover:border-[#374151] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Prev
+          <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: '1px solid color-mix(in oklab, var(--border) 50%, transparent)' }}>
+            <p className="text-xs" style={{ color: 'var(--color-muted-foreground)' }}>{(page-1)*20+1}–{Math.min(page*20, pagination.total)} of {pagination.total}</p>
+            <div className="flex gap-2 items-center">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="w-8 h-8 grid place-items-center rounded-lg transition-colors disabled:opacity-40"
+                style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)', color: 'var(--color-muted-foreground)' }}>
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-3 py-1.5 text-xs text-[#6b7280]">
-                {page} / {totalPages || 1}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1.5 text-xs bg-[#0d1117] border border-[#1f2937] rounded-lg text-[#9ca3af] hover:text-white hover:border-[#374151] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
+              <span className="text-xs" style={{ color: 'var(--color-muted-foreground)' }}>{page}/{totalPages || 1}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="w-8 h-8 grid place-items-center rounded-lg transition-colors disabled:opacity-40"
+                style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)', color: 'var(--color-muted-foreground)' }}>
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>

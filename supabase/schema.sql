@@ -1,4 +1,4 @@
--- Supabase Schema for Silent Fracture SOAR (No Prisma)
+-- Supabase Schema for Silent Fracture SOAR
 
 CREATE TYPE role_type AS ENUM ('SOC_ANALYST', 'SOC_LEAD', 'CISO', 'IT_ADMIN', 'LEGAL', 'EXEC', 'ADMIN');
 CREATE TYPE incident_status AS ENUM ('OPEN', 'CONTAINED', 'RESOLVED', 'CLOSED', 'SUSPENDED', 'ARCHIVED');
@@ -11,6 +11,23 @@ CREATE TABLE profiles (
   name TEXT,
   role role_type DEFAULT 'SOC_ANALYST',
   is_active BOOLEAN DEFAULT true,
+  -- Contact & identity
+  phone TEXT,
+  department TEXT,
+  bio TEXT,
+  avatar_url TEXT,
+  -- Experience
+  experience_level TEXT DEFAULT 'JUNIOR', -- JUNIOR | MID | SENIOR | LEAD
+  -- Notification preferences
+  notify_email BOOLEAN DEFAULT true,
+  notify_sms BOOLEAN DEFAULT false,
+  -- Locale
+  timezone TEXT DEFAULT 'UTC',
+  language TEXT DEFAULT 'en',
+  -- Computed stats (updated by triggers or app logic)
+  total_approvals INT DEFAULT 0,
+  total_rejections INT DEFAULT 0,
+  total_tasks_completed INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -23,20 +40,35 @@ CREATE TABLE incidents (
   source TEXT NOT NULL,
   assigned_to UUID REFERENCES profiles(id),
   raw_input JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  playbook_id TEXT,
+  -- SLA & compliance
+  priority INT DEFAULT 5,            -- 1 (highest) – 10 (lowest)
+  sla_deadline TIMESTAMPTZ,
+  sla_breached BOOLEAN DEFAULT false,
+  notify_72h_at TIMESTAMPTZ,
+  compliance_notified BOOLEAN DEFAULT false,
+  -- Resolution
   resolved_at TIMESTAMPTZ,
-  mttr_minutes INT
+  mttr_minutes INT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE incident_steps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id UUID REFERENCES incidents(id) ON DELETE CASCADE,
   step_type TEXT NOT NULL,
+  step_order INT DEFAULT 0,
   status step_status DEFAULT 'PENDING',
   assigned_role role_type,
+  assigned_user UUID REFERENCES profiles(id),
   result JSONB,
   error_detail TEXT,
+  -- SLA
+  sla_deadline TIMESTAMPTZ,
+  sla_breached BOOLEAN DEFAULT false,
+  priority INT DEFAULT 5,
+  -- Timing
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -46,9 +78,11 @@ CREATE TABLE incident_steps (
 CREATE TABLE step_actions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   step_id UUID REFERENCES incident_steps(id) ON DELETE CASCADE,
+  incident_id UUID REFERENCES incidents(id) ON DELETE CASCADE,
   actor_id UUID REFERENCES profiles(id),
-  action TEXT NOT NULL,
+  action TEXT NOT NULL,   -- APPROVE | REJECT | REPORT | REQUEST_REDESIGN | REASSIGN | SKIP
   reason TEXT,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -64,3 +98,41 @@ CREATE TABLE audit_log (
   row_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Indexes for performance
+CREATE INDEX idx_incidents_status ON incidents(status);
+CREATE INDEX idx_incidents_severity ON incidents(severity);
+CREATE INDEX idx_incidents_assigned_to ON incidents(assigned_to);
+CREATE INDEX idx_incident_steps_incident_id ON incident_steps(incident_id);
+CREATE INDEX idx_incident_steps_status ON incident_steps(status);
+CREATE INDEX idx_incident_steps_assigned_role ON incident_steps(assigned_role);
+CREATE INDEX idx_step_actions_actor_id ON step_actions(actor_id);
+CREATE INDEX idx_audit_log_incident_id ON audit_log(incident_id);
+CREATE INDEX idx_audit_log_actor ON audit_log(actor);
+
+-- Migration: if upgrading from old schema, run these:
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS department TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bio TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS experience_level TEXT DEFAULT 'JUNIOR';
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_email BOOLEAN DEFAULT true;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_sms BOOLEAN DEFAULT false;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC';
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en';
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS total_approvals INT DEFAULT 0;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS total_rejections INT DEFAULT 0;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS total_tasks_completed INT DEFAULT 0;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS priority INT DEFAULT 5;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS sla_deadline TIMESTAMPTZ;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS sla_breached BOOLEAN DEFAULT false;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS notify_72h_at TIMESTAMPTZ;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS compliance_notified BOOLEAN DEFAULT false;
+-- ALTER TABLE incidents ADD COLUMN IF NOT EXISTS playbook_id TEXT;
+-- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS step_order INT DEFAULT 0;
+-- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS assigned_user UUID REFERENCES profiles(id);
+-- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS sla_deadline TIMESTAMPTZ;
+-- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS sla_breached BOOLEAN DEFAULT false;
+-- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS priority INT DEFAULT 5;
+-- ALTER TABLE step_actions ADD COLUMN IF NOT EXISTS incident_id UUID REFERENCES incidents(id);
+-- ALTER TABLE step_actions ADD COLUMN IF NOT EXISTS notes TEXT;

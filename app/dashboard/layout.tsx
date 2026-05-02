@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar profile={profile} />
-      <main className="flex-1 overflow-y-auto p-6 bg-[#0b0f19] ml-60">
+      <main className="flex-1 overflow-y-auto p-6 ml-60" style={{ background: 'var(--color-background)' }}>
         <NotificationsProvider role={profile.role}>
           {children}
         </NotificationsProvider>

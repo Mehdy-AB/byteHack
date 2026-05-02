@@ -6,7 +6,17 @@
       "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\components\" -Force)",
       "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\" -Force)",
       "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\\\\incidents\" -Force)",
-      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\\\\incidents\\\\[id]\" -Force)"
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\\\\incidents\\\\[id]\" -Force)",
+      "Bash(npx next *)",
+      "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\supabase\" -ErrorAction SilentlyContinue)",
+      "Bash(select-object FullName)",
+      "PowerShell(Get-ChildItem -Recurse \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\supabase\" -ErrorAction SilentlyContinue | ForEach-Object {$_.FullName})",
+      "Bash(powershell -Command 'Get-PSDrive C | Select-Object @{N='\\\\''FreeMB'\\\\'';E={[math]::Round\\($_.Free/1MB,0\\)}}')"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\user\\Desktop\\bytehack\\app\\api\\admin\\users",
+      "c:\\Users\\user\\Desktop\\bytehack\\app\\api\\admin\\users\\[id]",
+      "c:\\Users\\user\\Desktop\\bytehack\\app\\dashboard\\tasks"
     ]
   }
 }

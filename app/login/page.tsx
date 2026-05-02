@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { Shield, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,44 +16,73 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    })
-
+    const result = await signIn('credentials', { email, password, redirect: false })
     if (result?.error) {
       setError('Invalid email or password.')
       setLoading(false)
       return
     }
-
     router.push('/dashboard')
     router.refresh()
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'color-mix(in oklab, var(--input) 60%, transparent)',
+    border: '1px solid var(--color-border)',
+    color: 'var(--color-foreground)',
+    borderRadius: '0.5rem',
+    padding: '10px 12px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.15s',
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b0f19] px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--color-background)' }}>
       <div className="w-full max-w-md">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <span className="text-3xl font-bold text-blue-500">⬡ Silent Fracture</span>
-          <p className="text-[#6b7280] text-sm mt-2 tracking-wider uppercase">Security Operations Platform</p>
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+            style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)', border: '1px solid color-mix(in oklab, var(--primary) 25%, transparent)' }}
+          >
+            <Shield className="h-7 w-7" style={{ color: 'var(--color-primary)' }} />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">SF SOAR</h1>
+          <p className="text-xs mt-1 uppercase tracking-widest" style={{ color: 'var(--color-muted-foreground)' }}>
+            Security Operations Platform
+          </p>
         </div>
 
-        <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-8 shadow-2xl">
-          <h1 className="text-xl font-semibold text-white mb-1">Sign In</h1>
-          <p className="text-[#6b7280] text-sm mb-6">Access your SOAR dashboard</p>
+        {/* Card */}
+        <div
+          className="rounded-2xl p-8"
+          style={{
+            background: 'var(--color-card)',
+            border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <h2 className="text-lg font-semibold mb-1">Sign In</h2>
+          <p className="text-xs mb-6" style={{ color: 'var(--color-muted-foreground)' }}>Access your SOAR dashboard</p>
 
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
+            <div
+              className="mb-4 px-4 py-3 rounded-lg text-sm"
+              style={{
+                background: 'color-mix(in oklab, var(--severity-critical) 10%, transparent)',
+                border: '1px solid color-mix(in oklab, var(--severity-critical) 25%, transparent)',
+                color: 'var(--severity-critical)',
+              }}
+            >
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-muted-foreground)' }}>
                 Email Address
               </label>
               <input
@@ -62,12 +92,14 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="analyst@org.com"
-                className="w-full bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 placeholder-[#4b5563] transition-colors"
+                style={inputStyle}
+                onFocus={e => (e.target.style.borderColor = 'var(--color-ring)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-muted-foreground)' }}>
                 Password
               </label>
               <input
@@ -77,22 +109,22 @@ export default function LoginPage() {
                 required
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="w-full bg-[#0d1117] border border-[#1f2937] text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 placeholder-[#4b5563] transition-colors"
+                style={inputStyle}
+                onFocus={e => (e.target.style.borderColor = 'var(--color-ring)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-medium transition-colors mt-2 flex items-center justify-center gap-2"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold mt-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Authenticating...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Authenticating…
                 </>
               ) : (
                 'Sign In'
@@ -101,8 +133,8 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-[#4b5563] text-xs mt-6">
-          Silent Fracture SOAR &mdash; Authorized Access Only
+        <p className="text-center text-[11px] mt-6" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>
+          Silent Fracture SOAR — Authorized Access Only
         </p>
       </div>
     </div>
