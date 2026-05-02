@@ -125,8 +125,8 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             <Shield className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
           </div>
           <div>
-            <div className="text-sm font-semibold tracking-tight">SF SOAR</div>
-            <div className="text-[11px]" style={{ color: 'var(--color-muted-foreground)' }}>Silent Fracture</div>
+            <div className="text-sm font-semibold tracking-tight">Mythos</div>
+            <div className="text-[11px]" style={{ color: 'var(--color-muted-foreground)' }}>Autonomous SOAR</div>
           </div>
         </div>
       </div>
