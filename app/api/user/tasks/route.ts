@@ -4,24 +4,36 @@ import { requireAuth } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   const authResult = await requireAuth()
   if ('error' in authResult) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+
+  const { searchParams } = new URL(req.url)
+  const filterStatus = searchParams.get('status')
+  const filterSeverity = searchParams.get('severity')
+  const sortBy = searchParams.get('sortBy') || 'requested_at'
+  const order = searchParams.get('order') || 'desc'
 
   const { user, profile } = authResult
   const supabase = await createClient()
 
   try {
-    const { data: steps, error } = await supabase
+    let query = supabase
       .from('incident_steps')
       .select('*, incidents(id, raw_input, severity, source)')
-      .in('status', ['PENDING', 'WAITING_APPROVAL'])
       .eq('step_type', 'APPROVAL')
-      .order('created_at', { ascending: false })
+
+    if (filterStatus) {
+      query = query.eq('status', filterStatus)
+    } else {
+      query = query.in('status', ['PENDING', 'WAITING_APPROVAL'])
+    }
+
+    const { data: steps, error } = await query
 
     if (error) throw new Error(error.message)
 
-    const tasks = (steps || [])
+    let tasks = (steps || [])
       .filter((step: any) => {
         const assignedRole = step.result?.assignedRole || step.assigned_role
         const assignedUser = step.result?.assignedUser
@@ -50,6 +62,25 @@ export async function GET() {
           sla_expires_at: payload.sla_expires_at || null,
         }
       })
+
+    if (filterSeverity) {
+      tasks = tasks.filter(t => t.context.severity === filterSeverity)
+    }
+
+    tasks.sort((a, b) => {
+      let valA = a[sortBy as keyof typeof a]
+      let valB = b[sortBy as keyof typeof b]
+      
+      // Handle nested context or fallback
+      if (sortBy === 'severity') {
+        valA = a.context.severity
+        valB = b.context.severity
+      }
+
+      if (valA < valB) return order === 'asc' ? -1 : 1
+      if (valA > valB) return order === 'asc' ? 1 : -1
+      return 0
+    })
 
     return NextResponse.json({ tasks })
   } catch (error) {

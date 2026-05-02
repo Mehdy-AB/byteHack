@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Test-Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\.env.local.example\")"
+      "Bash(Test-Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\.env.local.example\")",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\login\" -Force)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\components\" -Force)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\" -Force)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\\\\incidents\" -Force)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\app\\\\dashboard\\\\incidents\\\\[id]\" -Force)"
     ]
   }
 }

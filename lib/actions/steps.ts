@@ -135,3 +135,72 @@ export async function correctStepPayload(stepId: string, correctedPayload: any, 
     await supabase.from('incident_steps').update({ result: correctedPayload }).eq('id', stepId)
   }
 }
+
+export async function reportStep(stepId: string, feedback: string) {
+  const authResult = await requireAuth()
+  if ('error' in authResult) throw new Error(authResult.error)
+  if (!feedback) throw new Error('Feedback is required')
+
+  const supabase = await createClient()
+  const { data: step } = await supabase.from('incident_steps').select('*, incident_id').eq('id', stepId).single()
+  if (!step) throw new Error('Step not found')
+
+  if (step.assigned_role) {
+    const roleAuth = await requireAuth([step.assigned_role])
+    if ('error' in roleAuth) throw new Error('Insufficient privileges to report on this step')
+  }
+
+  const newResult = { ...(step.result || {}), user_feedback: feedback, reported_by: authResult.user.id }
+
+  // We change the status to SUSPENDED to indicate it needs review from a higher up or is blocked
+  await supabase.from('incident_steps').update({ 
+    status: 'SUSPENDED',
+    result: newResult
+  }).eq('id', stepId)
+
+  await supabase.from('step_actions').insert({ step_id: stepId, actor_id: authResult.user.id, action: 'REPORT', reason: feedback })
+  
+  await supabase.from('audit_log').insert({
+    incident_id: step.incident_id,
+    step_id: stepId,
+    actor: authResult.user.id,
+    action: 'STEP_REPORTED',
+    status: 'SUCCESS',
+    payload: { feedback }
+  })
+}
+
+export async function requestRedesign(stepId: string, reason: string) {
+  const authResult = await requireAuth()
+  if ('error' in authResult) throw new Error(authResult.error)
+  if (!reason) throw new Error('Redesign reason is required')
+
+  const supabase = await createClient()
+  const { data: step } = await supabase.from('incident_steps').select('*, incident_id').eq('id', stepId).single()
+  if (!step) throw new Error('Step not found')
+
+  if (step.assigned_role) {
+    const roleAuth = await requireAuth([step.assigned_role])
+    if ('error' in roleAuth) throw new Error('Insufficient privileges to request redesign for this step')
+  }
+
+  const newResult = { ...(step.result || {}), workflow_redesign_requested: true, redesign_reason: reason }
+
+  await supabase.from('incident_steps').update({ 
+    status: 'SUSPENDED',
+    result: newResult,
+    error_detail: 'Workflow redesign requested'
+  }).eq('id', stepId)
+
+  await supabase.from('step_actions').insert({ step_id: stepId, actor_id: authResult.user.id, action: 'REQUEST_REDESIGN', reason })
+  
+  await supabase.from('audit_log').insert({
+    incident_id: step.incident_id,
+    step_id: stepId,
+    actor: authResult.user.id,
+    action: 'WORKFLOW_REDESIGN_REQUESTED',
+    status: 'SUCCESS',
+    payload: { reason }
+  })
+}
+

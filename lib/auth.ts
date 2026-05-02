@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/auth'
 import { AuthResult, RoleType } from '@/lib/types'
-import { headers } from 'next/headers'
 
 const ROLE_HIERARCHY: Record<RoleType, number> = {
   ADMIN: 100,
@@ -13,52 +13,33 @@ const ROLE_HIERARCHY: Record<RoleType, number> = {
 }
 
 export async function requireAuth(allowedRoles?: RoleType[]): Promise<AuthResult> {
-  const supabase = await createClient()
-  
-  const headersList = await headers()
-  const authHeader = headersList.get('authorization')
-  
-  let user;
-  let authError;
+  const session = await getServerSession(authOptions)
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-    const { data, error } = await supabase.auth.getUser(token)
-    user = data?.user
-    authError = error
-  } else {
-    const { data, error } = await supabase.auth.getUser()
-    user = data?.user
-    authError = error
-  }
-
-  if (authError || !user) {
+  if (!session?.user) {
     return { error: 'Unauthorized', status: 401 }
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) {
-    return { error: 'Profile not found', status: 404 }
-  }
-
-  if (!profile.is_active) {
-    return { error: 'Account disabled', status: 403 }
+  const profile = {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name ?? null,
+    role: (session.user as any).role as RoleType,
+    is_active: true,
+    created_at: '',
+    updated_at: '',
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
-    const hasAllowedRole = allowedRoles.some(role => 
-      ROLE_HIERARCHY[profile.role as RoleType] >= ROLE_HIERARCHY[role]
+    const hasAllowedRole = allowedRoles.some(
+      role => ROLE_HIERARCHY[profile.role] >= ROLE_HIERARCHY[role]
     )
-
     if (!hasAllowedRole) {
       return { error: 'Forbidden: Insufficient privileges', status: 403 }
     }
   }
 
-  return { user, profile }
+  return {
+    user: { id: session.user.id, email: session.user.email },
+    profile,
+  }
 }
