@@ -108,15 +108,15 @@ export function IncidentTable({ onSelect }: Props) {
           ))}
 
           <div className="flex flex-col gap-0.5 shrink-0">
-            <label className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>Source</label>
+            <label className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: 'var(--color-muted-foreground)' }}>Search Source</label>
             <div className="relative">
               <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted-foreground)' }} />
               <input
                 type="text"
-                placeholder="Source…"
+                placeholder="Source (IP, Host...)"
                 value={source}
                 onChange={e => { setSource(e.target.value); setPage(1) }}
-                style={{ ...sel, paddingLeft: '22px', width: '100px' }}
+                style={{ ...sel, paddingLeft: '22px', width: '150px' }}
               />
             </div>
           </div>

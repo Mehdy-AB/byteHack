@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     if (status) query = query.eq('status', status)
     if (severity) query = query.eq('severity', severity)
-    if (source) query = query.eq('source', source)
+    if (source) query = query.ilike('source', `%${source}%`)
     if (assigned_to) query = query.eq('assigned_to', assigned_to)
     if (dateFrom) query = query.gte('created_at', dateFrom)
     if (dateTo) query = query.lte('created_at', dateTo)
