@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SOC_ANALYST
+  SOC_LEAD
+  CISO
+  IT_ADMIN
+  LEGAL
+  EXEC
+  ADMIN
+}
+
+enum IncidentStatus {
+  OPEN
+  CONTAINED
+  RESOLVED
+  CLOSED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum StepType {
+  INTEGRATION
+  WEBHOOK
+  SCRIPT
+  APPROVAL
+  EMAIL
+  SMS
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+  WAITING_APPROVAL
+}
+
+model Profile {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String?
+  role      Role     @default(SOC_ANALYST)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assignedIncidents Incident[]   @relation("AssignedTo")
+  stepActions       StepAction[]
+
+  @@map("profiles")
+}
+
+model Incident {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status              IncidentStatus @default(OPEN)
+  severity            Severity       @default(MEDIUM)
+  severityScore       Int            @default(0) @map("severity_score")
+  source              String
+  playbookId          String?        @map("playbook_id")
+  assignedTo          String?        @map("assigned_to") @db.Uuid
+  aiConfidence        Float?         @map("ai_confidence")
+  rawInput            Json?          @map("raw_input")
+  slaBreached         Boolean        @default(false) @map("sla_breached")
+  notify72hAt         DateTime?      @map("notify_72h_at")
+  complianceNotified  Boolean        @default(false) @map("compliance_notified")
+  resolvedAt          DateTime?      @map("resolved_at")
+  mttrMinutes         Int?           @map("mttr_minutes")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  assignee  Profile?        @relation("AssignedTo", fields: [assignedTo], references: [id])
+  steps     IncidentStep[]
+  auditLogs AuditLog[]
+
+  @@map("incidents")
+}
+
+model IncidentStep {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentId  String     @map("incident_id") @db.Uuid
+  stepId      String?    @map("step_id")
+  stepType    StepType   @map("step_type")
+  status      StepStatus @default(PENDING)
+  assignedRole Role?     @map("assigned_role")
+  result      Json?
+  errorDetail String?    @map("error_detail")
+  startedAt   DateTime?  @map("started_at")
+  completedAt DateTime?  @map("completed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  incident    Incident     @relation(fields: [incidentId], references: [id])
+  stepActions StepAction[]
+
+  @@map("incident_steps")
+}
+
+model StepAction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stepId    String   @map("step_id") @db.Uuid
+  actorId   String   @map("actor_id") @db.Uuid
+  action    String
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  step  IncidentStep @relation(fields: [stepId], references: [id])
+  actor Profile      @relation(fields: [actorId], references: [id])
+
+  @@map("step_actions")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  incidentId String   @map("incident_id") @db.Uuid
+  stepId     String?  @map("step_id") @db.Uuid
+  actor      String
+  action     String
+  status     String
+  payload    Json?
+  compliance String[] @default([])
+  prevHash   String?  @map("prev_hash")
+  rowHash    String?  @map("row_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  incident Incident @relation(fields: [incidentId], references: [id])
+
+  @@map("audit_log")
+}

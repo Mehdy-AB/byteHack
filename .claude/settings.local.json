@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Test-Path \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\.env.local.example\")"
+    ]
+  }
+}
