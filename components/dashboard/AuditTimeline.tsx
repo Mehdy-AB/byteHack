@@ -87,6 +87,7 @@ export function AuditTimeline({ incidentId }: Props) {
         const creation: AuditEntry = {
           id: 'creation',
           action: 'INCIDENT_CREATED',
+          status: null,
           performed_by: 'System',
           reason: incident.raw_input?.title || 'New incident',
           metadata: null,
@@ -191,7 +192,7 @@ export function AuditTimeline({ incidentId }: Props) {
                             {entry.status.replace(/_/g, ' ')}
                           </span>
                         )}
-                        <span className="font-medium" style={{ color: 'var(--foreground)', wordBreak: 'break-word' }}>
+                        <span className="font-bold flex-1 truncate" style={{ color: 'var(--foreground)' }}>
                           {entry.action.replace(/_/g, ' ')}
                         </span>
                         {entry.reason && (

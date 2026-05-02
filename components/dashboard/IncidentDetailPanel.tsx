@@ -224,9 +224,13 @@ export function IncidentDetailPanel({ incident }: Props) {
                         style={{ background: 'var(--color-card)', borderColor: 'var(--color-primary)' }} />
                       <div className="rounded-lg p-3"
                         style={{ background: 'color-mix(in oklab, var(--muted) 20%, transparent)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' }}>
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <span className="text-[11px] font-semibold font-mono">{log.action}</span>
-                          <StatusBadge status={log.status} />
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-[10px] font-bold font-mono truncate flex-1" style={{ color: 'var(--color-foreground)' }}>
+                            {log.action.replace(/_/g, ' ')}
+                          </span>
+                          <div className="shrink-0 scale-90 origin-right">
+                            <StatusBadge status={log.status} />
+                          </div>
                         </div>
                         <p className="text-[11px] truncate" style={{ color: 'var(--color-muted-foreground)' }}>
                           {log.actor ? `${log.actor.slice(0, 8)}…` : 'System'}

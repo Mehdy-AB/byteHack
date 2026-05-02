@@ -26,7 +26,7 @@ export async function GET() {
       supabase.from('incident_steps').select('*', { count: 'exact', head: true }).eq('status', 'FAILED').gte('created_at', ago24h),
       supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('severity', 'CRITICAL').in('status', ['OPEN', 'CONTAINED']),
       supabase.from('incident_steps').select('id, incident_id, step_type, error_detail, created_at').eq('status', 'FAILED').gte('created_at', ago24h).order('created_at', { ascending: false }).limit(20),
-      supabase.from('incident_steps').select('id, incident_id, step_type, assigned_role, created_at').eq('status', 'WAITING_APPROVAL').order('created_at', { ascending: true }).limit(20),
+      supabase.from('incident_steps').select('id, incident_id, step_type, assigned_role, created_at').eq('status', 'WAITING_APPROVAL').order('created_at', { ascending: false }).limit(20),
     ])
 
     return NextResponse.json({
