@@ -16,6 +16,25 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
+    if (!email) {
+      setError('Email address is required.')
+      setLoading(false)
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address (e.g., analyst@org.com).")
+      setLoading(false)
+      return
+    }
+
+    if (!password) {
+      setError('Password is required.')
+      setLoading(false)
+      return
+    }
+
     const result = await signIn('credentials', {
       email,
       password,
@@ -50,7 +69,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label className="block text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-1.5">
                 Email Address
