@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/auth'
+import { explainTask } from '@/lib/gemini'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,11 +14,29 @@ export async function POST(request: Request) {
 
     const payload = await request.json()
     
-    // Default to localhost:8000 if not specified
+    // Check if this is an explanation request
+    if (payload.mode === 'explain') {
+      try {
+        const explanation = await explainTask(payload.taskData)
+        return NextResponse.json({ 
+          incident_type: 'Task Interpretation',
+          summary: explanation.summary,
+          adminAnalysis: explanation.adminAnalysis,
+          rhAnalysis: explanation.rhAnalysis,
+          retrieval: {
+            chunks_found: 1,
+            grouped: { "AI Analysis": [{ content: "Analysis generated via Gemini 1.5 Flash", topic: "Expert System", similarity: 1 }] }
+          }
+        })
+      } catch (err: any) {
+        console.error('Gemini explanation failed:', err)
+        return NextResponse.json({ error: 'Gemini analysis failed. Please check your API key.' }, { status: 503 })
+      }
+    }
+
+    // Default to localhost:8000 for original log analysis if mode is not explain
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
     const analyzeUrl = `${backendUrl}/analyze`
-
-    console.log(`Forwarding log analysis to backend: ${analyzeUrl}`)
 
     const response = await fetch(analyzeUrl, {
       method: 'POST',

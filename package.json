@@ -1,5 +1,5 @@
 {
-  "name": "bytehack",
+  "name": "mythos",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,6 +11,7 @@
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/utilities": "^3.2.2",
+    "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.39.7",
     "@vercel/functions": "^1.4.0",

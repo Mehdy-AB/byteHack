@@ -23,7 +23,6 @@ export default function DashboardPage() {
 
   function handleSelect(incident: IncidentRow) {
     setSelected(incident)
-    setTab('overview')
   }
 
   function handleClose() {

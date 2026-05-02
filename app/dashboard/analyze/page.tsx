@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Activity, Shield, AlertTriangle, Cpu, Code, BookOpen, ChevronRight, Terminal, CheckCircle2, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -36,14 +37,37 @@ const Card = ({ children, className = "", style = {} }: { children: React.ReactN
 )
 
 export default function AIAnalyzerPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center">Loading AI Engine...</div>}>
+      <AIAnalyzerContent />
+    </Suspense>
+  )
+}
+
+function AIAnalyzerContent() {
+  const searchParams = useSearchParams()
   const [logs, setLogs] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
   const [activeTab, setActiveTab] = useState<'summary' | 'workflow' | 'context'>('summary')
   const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: () => {} })
 
-  async function handleAnalyze(e: React.FormEvent) {
-    e.preventDefault()
+  useEffect(() => {
+    const explain = searchParams.get('explain')
+    if (explain) {
+      try {
+        const taskData = JSON.parse(decodeURIComponent(explain))
+        const prompt = `Explain this workflow task in detail for both an Administrator (Technical) and HR (Skills/Requirements):\n\nTask: ${taskData.task}\nOrder: ${taskData.order}\nStatus: ${taskData.status}\nDetails: ${taskData.details}\n\nPlease provide a comprehensive breakdown of what this means for the security posture and what human expertise is required.`
+        setLogs(prompt)
+        handleAnalyze(undefined, taskData)
+      } catch (e) {
+        console.error('Failed to parse explain param', e)
+      }
+    }
+  }, [searchParams])
+
+  async function handleAnalyze(e?: React.FormEvent, explainData?: any) {
+    if (e) e.preventDefault()
     
     if (!logs.trim()) {
       toast.error('Please paste some security logs to analyze.')
@@ -54,18 +78,23 @@ export default function AIAnalyzerPage() {
     setResult(null)
 
     try {
-      // Try to parse as JSON first, if it fails, send as a string in a wrapper
-      let payload: any
-      try {
-        payload = JSON.parse(logs)
-      } catch {
-        payload = { raw_text: logs, incident_type: 'Manual Investigation' }
+      let body: any
+      
+      if (explainData) {
+        body = { mode: 'explain', taskData: explainData }
+      } else {
+        // Try to parse as JSON first, if it fails, send as a string in a wrapper
+        try {
+          body = JSON.parse(logs)
+        } catch {
+          body = { raw_text: logs, incident_type: 'Manual Investigation' }
+        }
       }
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       })
 
       const data = await response.json()
@@ -132,6 +161,7 @@ export default function AIAnalyzerPage() {
               />
               <div className="absolute bottom-4 right-4">
                 <button
+                  id="run-analysis-btn"
                   onClick={handleAnalyze}
                   disabled={loading || !logs.trim()}
                   className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
