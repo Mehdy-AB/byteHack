@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { GitBranch, CheckCircle2, XCircle, Clock, Loader2, AlertCircle } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { GitBranch, CheckCircle2, XCircle, Clock, Loader2, AlertCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 
 function relativeTime(s: string) {
   const diff = Math.floor((Date.now() - new Date(s).getTime()) / 1000)
@@ -42,6 +42,29 @@ export function WorkflowViewer({ incidentId }: Props) {
   const [steps, setSteps] = useState<Step[]>([])
   const [loading, setLoading] = useState(false)
   const [incidentTitle, setIncidentTitle] = useState<string | null>(null)
+  const [scale, setScale] = useState(1)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const handleZoomIn = () => setScale(s => Math.min(s + 0.1, 2))
+  const handleZoomOut = () => setScale(s => Math.max(s - 0.1, 0.4))
+  const handleReset = () => setScale(1)
+
+  const handleWheel = (e: WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? -0.1 : 0.1
+      setScale(s => Math.min(Math.max(s + delta, 0.4), 2))
+    }
+  }
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const wheelHandler = (e: WheelEvent) => handleWheel(e)
+    container.addEventListener('wheel', wheelHandler, { passive: false })
+    return () => container.removeEventListener('wheel', wheelHandler)
+  }, [])
 
   useEffect(() => {
     if (!incidentId) { setSteps([]); return }
@@ -87,15 +110,45 @@ export function WorkflowViewer({ incidentId }: Props) {
 
       {/* Canvas Area (n8n style) */}
       <div
-        className="flex-1 overflow-auto relative p-16"
+        ref={containerRef}
+        className="flex-1 overflow-auto relative p-16 select-none"
         style={{
           background: 'color-mix(in oklab, var(--background) 95%, var(--muted))',
           backgroundImage: 'radial-gradient(color-mix(in oklab, var(--border) 80%, transparent) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+          backgroundSize: `${24 * scale}px ${24 * scale}px`,
+          backgroundPosition: 'center',
         }}
       >
+        {/* Floating Zoom Controls */}
+        <div className="absolute bottom-8 right-8 z-50 flex items-center gap-1 p-1.5 rounded-2xl shadow-2xl border border-border/50 bg-card/80 backdrop-blur-xl">
+          <button
+            onClick={handleZoomOut}
+            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors text-foreground/70 hover:text-primary"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-4.5 w-4.5" />
+          </button>
+          <div className="w-px h-4 bg-border/50 mx-1" />
+          <button
+            onClick={handleReset}
+            className="px-3 py-2.5 rounded-xl hover:bg-primary/10 transition-colors text-foreground/70 hover:text-primary flex items-center gap-2"
+            title="Reset Zoom"
+          >
+            <Maximize2 className="h-4 w-4" />
+            <span className="text-[10px] font-bold tabular-nums">{Math.round(scale * 100)}%</span>
+          </button>
+          <div className="w-px h-4 bg-border/50 mx-1" />
+          <button
+            onClick={handleZoomIn}
+            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors text-foreground/70 hover:text-primary"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-4.5 w-4.5" />
+          </button>
+        </div>
+
         {loading ? (
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-8" style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}>
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-32 w-64 rounded-xl animate-pulse shrink-0" style={{ background: 'var(--color-muted)' }} />
             ))}
@@ -107,7 +160,10 @@ export function WorkflowViewer({ incidentId }: Props) {
             <div className="text-xs mt-1" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>Run a workflow or select an incident</div>
           </div>
         ) : (
-          <div className="flex items-center min-h-full w-max">
+          <div 
+            className="flex items-center min-h-full w-max transition-transform duration-200 ease-out" 
+            style={{ transform: `scale(${scale})`, transformOrigin: '0 50%' }}
+          >
             {steps.sort((a, b) => a.step_order - b.step_order).map((step, idx) => {
               const meta = getStepMeta(step.status)
               const Icon = meta.icon
