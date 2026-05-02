@@ -40,6 +40,7 @@ export default function AIAnalyzerPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
   const [activeTab, setActiveTab] = useState<'summary' | 'workflow' | 'context'>('summary')
+  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: () => {} })
 
   async function handleAnalyze(e: React.FormEvent) {
     e.preventDefault()
@@ -275,25 +276,29 @@ export default function AIAnalyzerPage() {
                       <div className="text-xs font-mono text-muted-foreground">GENERATED_RESPONSE_PLAN.json</div>
                       <div className="flex gap-2">
                         <button 
-                          onClick={async () => {
-                            const ok = confirm('Initialize this incident and execute the workflow?')
-                            if (!ok) return
-                            
-                            toast.loading('Initializing workflow...', { id: 'exec' })
-                            try {
-                              const res = await fetch('/api/analyze/execute', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(result.workflow),
-                              })
-                              const d = await res.json()
-                              if (!res.ok) throw new Error(d.error || 'Execution failed')
-                              
-                              toast.success('Incident Created & Workflow Started!', { id: 'exec' })
-                              // Optionally redirect or show incident link
-                            } catch (err: any) {
-                              toast.error(err.message, { id: 'exec' })
-                            }
+                          onClick={() => {
+                            setConfirmModal({
+                              open: true,
+                              title: 'Execute Workflow',
+                              message: 'Initialize a new incident and start executing this AI-generated response plan immediately?',
+                              onConfirm: async () => {
+                                toast.loading('Initializing workflow...', { id: 'exec' })
+                                try {
+                                  const res = await fetch('/api/analyze/execute', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(result.workflow),
+                                  })
+                                  const d = await res.json()
+                                  if (!res.ok) throw new Error(d.error || 'Execution failed')
+                                  
+                                  toast.success('Incident Created & Workflow Started!', { id: 'exec' })
+                                  setConfirmModal(prev => ({ ...prev, open: false }))
+                                } catch (err: any) {
+                                  toast.error(err.message, { id: 'exec' })
+                                }
+                              }
+                            })
                           }}
                           className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary hover:bg-primary/30 px-3 py-1 rounded transition-colors flex items-center gap-1.5"
                           style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)', color: 'var(--color-primary)' }}
@@ -365,6 +370,47 @@ export default function AIAnalyzerPage() {
           )}
         </div>
       </div>
+      {/* Confirmation Modal */}
+      {confirmModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            onClick={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+          />
+          <div 
+            className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl border border-white/10 animate-in zoom-in-95 duration-200"
+            style={{ background: 'var(--color-card)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-primary/15 grid place-items-center" style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)' }}>
+                <Shield className="h-5 w-5 text-primary" style={{ color: 'var(--color-primary)' }} />
+              </div>
+              <h2 className="text-xl font-bold">{confirmModal.title}</h2>
+            </div>
+            
+            <p className="text-sm leading-relaxed mb-8" style={{ color: 'var(--color-muted-foreground)' }}>
+              {confirmModal.message}
+            </p>
+            
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: 'var(--color-muted)', color: 'var(--color-foreground)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-lg shadow-primary/20"
+                style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+              >
+                Confirm & Execute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
