@@ -3,34 +3,33 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError(null)
 
     if (!email) {
-      setError('Email address is required.')
+      toast.error('Email address is required.')
       setLoading(false)
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address (e.g., analyst@org.com).")
+      toast.error("Please enter a valid email address (e.g., analyst@org.com).")
       setLoading(false)
       return
     }
 
     if (!password) {
-      setError('Password is required.')
+      toast.error('Password is required.')
       setLoading(false)
       return
     }
@@ -42,7 +41,7 @@ export default function LoginPage() {
     })
 
     if (result?.error) {
-      setError('Invalid email or password.')
+      toast.error('Invalid email or password.')
       setLoading(false)
       return
     }
@@ -62,12 +61,6 @@ export default function LoginPage() {
         <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-8 shadow-2xl">
           <h1 className="text-xl font-semibold text-white mb-1">Sign In</h1>
           <p className="text-[#6b7280] text-sm mb-6">Access your SOAR dashboard</p>
-
-          {error && (
-            <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>

@@ -22,20 +22,36 @@ export const authOptions: NextAuthOptions = {
           email: credentials.email,
           password: credentials.password,
         })
-        if (error || !data.user) return null
+        if (error || !data.user) {
+          console.error('Supabase Auth Error:', error?.message || 'No user returned')
+          return null
+        }
 
         // Fetch profile (role, active status) from DB
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          console.error('Missing SUPABASE_SERVICE_ROLE_KEY in .env.local')
+          return null
+        }
+
         const admin = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
-        const { data: profile } = await admin
+        const { data: profile, error: profileError } = await admin
           .from('profiles')
           .select('id, name, role, is_active')
           .eq('id', data.user.id)
           .single()
 
-        if (!profile || !profile.is_active) return null
+        if (profileError || !profile) {
+          console.error('Supabase Profile Fetch Error:', profileError?.message || 'Profile not found')
+          return null
+        }
+
+        if (!profile.is_active) {
+          console.error('Profile is deactivated for user:', data.user.id)
+          return null
+        }
 
         return {
           id: profile.id,
