@@ -27,12 +27,17 @@ export async function POST(request: Request) {
     const payload = parsed.data
     const supabase = await createClient()
 
+    // Auto-assign incident to the first step's user if available
+    const firstAssignedUser = payload.steps?.find(s => s.assignedUser)?.assignedUser || null
+
     const { data: incident, error: incidentError } = await supabase
       .from('incidents')
       .insert({
         source: payload.source,
         severity: payload.severity,
-        raw_input: payload
+        raw_input: payload,
+        assigned_to: firstAssignedUser,
+        playbook_id: payload.playbook_id || null,
       })
       .select()
       .single()
@@ -42,11 +47,13 @@ export async function POST(request: Request) {
     }
 
     if (payload.steps && payload.steps.length > 0) {
-      const stepsToInsert = payload.steps.map((step) => ({
+      const stepsToInsert = payload.steps.map((step, index) => ({
         incident_id: incident.id,
         step_type: step.type,
+        step_order: index + 1,
         status: 'PENDING',
         assigned_role: step.assignedRole || null,
+        assigned_user: step.assignedUser || null,
         result: step
       }))
 

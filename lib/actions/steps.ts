@@ -50,8 +50,29 @@ export async function rejectStep(stepId: string, reason: string) {
     if ('error' in roleAuth) throw new Error('Insufficient privileges to reject this step')
   }
 
+  // Mark this step as FAILED
   await supabase.from('incident_steps').update({ status: 'FAILED', completed_at: new Date().toISOString() }).eq('id', stepId)
   await supabase.from('step_actions').insert({ step_id: stepId, actor_id: authResult.user.id, action: 'REJECT', reason })
+
+  // Skip all remaining PENDING steps in the chain
+  await supabase
+    .from('incident_steps')
+    .update({ status: 'SKIPPED', completed_at: new Date().toISOString() })
+    .eq('incident_id', step.incident_id)
+    .in('status', ['PENDING'])
+
+  // Suspend the incident
+  await supabase.from('incidents').update({ status: 'SUSPENDED' }).eq('id', step.incident_id)
+
+  // Audit log
+  await supabase.from('audit_log').insert({
+    incident_id: step.incident_id,
+    step_id: stepId,
+    actor: authResult.user.id,
+    action: 'STEP_REJECT',
+    status: 'FAILED',
+    payload: { reason }
+  })
 }
 
 export async function retryStep(stepId: string) {

@@ -37,12 +37,25 @@ const FILTERS: Array<{ key: 'ALL' | Severity; label: string }> = [
   { key: 'LOW', label: 'Low' },
 ]
 
-interface Props {
-  selectedId: string | null
-  onSelect: (id: string) => void
+export interface SidebarIncidentRow {
+  id: string
+  severity: Severity
+  status: string
+  source: string
+  raw_input: { title?: string } | null
+  created_at: string
+  assigned_to: string | null
+  sla_breached: boolean
+  profiles?: { name?: string } | null
 }
 
-export function AlertSidebar({ selectedId, onSelect }: Props) {
+interface Props {
+  selectedId: string | null
+  onSelect: (incident: SidebarIncidentRow) => void
+  hideBorder?: boolean
+}
+
+export function AlertSidebar({ selectedId, onSelect, hideBorder }: Props) {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [filter, setFilter] = useState<'ALL' | Severity>('ALL')
   const [query, setQuery] = useState('')
@@ -78,7 +91,7 @@ export function AlertSidebar({ selectedId, onSelect }: Props) {
   return (
     <aside
       className="flex flex-col h-full"
-      style={{ background: 'var(--color-background)', borderRight: '1px solid var(--color-border)' }}
+      style={{ background: 'var(--color-background)', borderRight: hideBorder ? 'none' : '1px solid var(--color-border)' }}
     >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 space-y-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -145,7 +158,7 @@ export function AlertSidebar({ selectedId, onSelect }: Props) {
             return (
               <button
                 key={inc.id}
-                onClick={() => onSelect(inc.id)}
+                onClick={() => onSelect(inc as SidebarIncidentRow)}
                 className="w-full text-left relative rounded-xl overflow-hidden transition-all duration-200 slide-in"
                 style={isSelected
                   ? { border: '1px solid color-mix(in oklab, var(--primary) 50%, transparent)', background: 'color-mix(in oklab, var(--primary) 5%, transparent)' }

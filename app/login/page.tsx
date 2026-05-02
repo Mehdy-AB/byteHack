@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Shield, Loader2 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,7 +15,6 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError(null)
     const result = await signIn('credentials', { email, password, redirect: false })
     if (result?.error) {
       toast.error('Invalid email or password.')
@@ -65,19 +65,6 @@ export default function LoginPage() {
         >
           <h2 className="text-lg font-semibold mb-1">Sign In</h2>
           <p className="text-xs mb-6" style={{ color: 'var(--color-muted-foreground)' }}>Access your SOAR dashboard</p>
-
-          {error && (
-            <div
-              className="mb-4 px-4 py-3 rounded-lg text-sm"
-              style={{
-                background: 'color-mix(in oklab, var(--severity-critical) 10%, transparent)',
-                border: '1px solid color-mix(in oklab, var(--severity-critical) 25%, transparent)',
-                color: 'var(--severity-critical)',
-              }}
-            >
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

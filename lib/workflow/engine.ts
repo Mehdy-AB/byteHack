@@ -85,7 +85,7 @@ export async function processWorkflowSteps(incidentId: string) {
         }
       }
 
-      console.log(`Processing step: ${step.step_type} for incident ${incidentId}`)
+      console.log(`Processing step ${step.step_order || '?'}: ${step.step_type} for incident ${incidentId}`)
       await supabase
         .from('incident_steps')
         .update({ status: 'RUNNING', started_at: new Date().toISOString() })
@@ -101,10 +101,22 @@ export async function processWorkflowSteps(incidentId: string) {
             const slaDeadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString()
             await supabase
               .from('incident_steps')
-              .update({ sla_deadline: slaDeadline })
+              .update({ status: 'WAITING_APPROVAL', sla_deadline: slaDeadline })
               .eq('id', step.id)
             await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
-            break
+
+            await supabase.from('audit_log').insert({
+              incident_id: incidentId,
+              step_id: step.id,
+              actor: 'WORKFLOW_ENGINE',
+              action: 'EXECUTE_APPROVAL',
+              status: 'WAITING_APPROVAL',
+              payload: { step_order: step.step_order },
+            })
+
+            // STOP — wait for human to Approve/Reject before continuing the chain
+            console.log(`⏸  Chain paused at step ${step.step_order || '?'} (APPROVAL) — waiting for human action.`)
+            return
           }
 
           case 'INTEGRATION':
@@ -131,20 +143,25 @@ export async function processWorkflowSteps(incidentId: string) {
         await supabase.from('incident_steps').update({ error_detail: err.message }).eq('id', step.id)
       }
 
-      if (stepStatus !== 'WAITING_APPROVAL') {
-        await supabase
-          .from('incident_steps')
-          .update({ status: stepStatus, completed_at: new Date().toISOString() })
-          .eq('id', step.id)
+      // Finalize the step
+      await supabase
+        .from('incident_steps')
+        .update({ status: stepStatus, completed_at: new Date().toISOString() })
+        .eq('id', step.id)
 
-        await supabase.from('audit_log').insert({
-          incident_id: incidentId,
-          step_id: step.id,
-          actor: 'WORKFLOW_ENGINE',
-          action: `EXECUTE_${step.step_type}`,
-          status: stepStatus,
-          payload: step.result,
-        })
+      await supabase.from('audit_log').insert({
+        incident_id: incidentId,
+        step_id: step.id,
+        actor: 'WORKFLOW_ENGINE',
+        action: `EXECUTE_${step.step_type}`,
+        status: stepStatus,
+        payload: { step_order: step.step_order },
+      })
+
+      // If a step FAILED, stop the chain — don't process further steps
+      if (stepStatus === 'FAILED') {
+        console.log(`🛑 Chain halted at step ${step.step_order || '?'} (FAILED).`)
+        return
       }
     }
 

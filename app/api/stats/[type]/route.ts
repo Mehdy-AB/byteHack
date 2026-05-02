@@ -15,63 +15,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
     switch (type) {
       case 'summary': {
         const now = new Date()
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-        const { count: total24h } = await supabase
-          .from('incidents')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', yesterday)
+        const [
+          { count: totalIncidents },
+          { count: openIncidents },
+          { count: criticalOpen },
+          { count: pendingApprovals },
+          { count: law1807Overdue },
+          { count: totalLast7 },
+          { count: slaBreached },
+        ] = await Promise.all([
+          supabase.from('incidents').select('*', { count: 'exact', head: true }),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('severity', 'CRITICAL').in('status', ['OPEN', 'CONTAINED']),
+          supabase.from('incident_steps').select('*', { count: 'exact', head: true }).eq('status', 'WAITING_APPROVAL'),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('compliance_notified', false).lt('notify_72h_at', now.toISOString()).not('notify_72h_at', 'is', null),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('sla_breached', true).gte('created_at', sevenDaysAgo),
+        ])
 
-        const severityLevels = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
-        const incidentsBySeverity: Record<string, number> = {}
-        for (const sev of severityLevels) {
-          const { count } = await supabase
-            .from('incidents')
-            .select('*', { count: 'exact', head: true })
-            .eq('severity', sev)
-            .in('status', ['OPEN', 'CONTAINED'])
-          incidentsBySeverity[sev] = count || 0
-        }
-
-        const { data: resolved } = await supabase
-          .from('incidents')
-          .select('mttr_minutes')
-          .not('mttr_minutes', 'is', null)
-          .gte('resolved_at', sevenDaysAgo)
-        const avgResolution =
-          resolved && resolved.length > 0
-            ? Math.round(resolved.reduce((sum, r: any) => sum + r.mttr_minutes, 0) / resolved.length)
-            : 0
-
-        const { count: pendingApprovals } = await supabase
-          .from('incident_steps')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'WAITING_APPROVAL')
-
-        const { count: law1807Overdue } = await supabase
-          .from('incidents')
-          .select('*', { count: 'exact', head: true })
-          .eq('compliance_notified', false)
-          .lt('notify_72h_at', now.toISOString())
-          .not('notify_72h_at', 'is', null)
-
-        const { count: totalLast7 } = await supabase
-          .from('incidents')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', sevenDaysAgo)
-        const { count: slaBreached } = await supabase
-          .from('incidents')
-          .select('*', { count: 'exact', head: true })
-          .eq('sla_breached', true)
-          .gte('created_at', sevenDaysAgo)
-        const slaBreachRate7d =
-          totalLast7 ? Math.round(((slaBreached || 0) / totalLast7) * 100) / 100 : 0
+        const slaBreachRate7d = totalLast7 ? Math.round(((slaBreached || 0) / totalLast7) * 100) / 100 : 0
 
         return NextResponse.json({
-          total_incidents_24h: total24h || 0,
-          incidents_by_severity: incidentsBySeverity,
-          average_resolution_time_minutes: avgResolution,
+          total_incidents: totalIncidents || 0,
+          open_incidents: openIncidents || 0,
+          critical_open: criticalOpen || 0,
           pending_approvals: pendingApprovals || 0,
           law_1807_overdue: law1807Overdue || 0,
           sla_breach_rate_7d: slaBreachRate7d,

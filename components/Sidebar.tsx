@@ -2,33 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { LayoutDashboard, AlertTriangle, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { LayoutDashboard, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel } from 'lucide-react'
 
 interface Profile {
   name: string | null
   role: string
   email: string
 }
-
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-  {
-    label: 'Incidents',
-    href: '/dashboard/incidents',
-    icon: <AlertTriangle className="w-4 h-4" />,
-    roles: ['ADMIN', 'CISO', 'SOC_LEAD', 'SOC_ANALYST'],
-  },
-  { label: 'My Tasks', href: '/dashboard/tasks', icon: <CheckSquare className="w-4 h-4" /> },
-  { label: 'History', href: '/dashboard/history', icon: <History className="w-4 h-4" /> },
-  {
-    label: 'Compliance',
-    href: '/dashboard/compliance',
-    icon: <Gavel className="w-4 h-4" />,
-    roles: ['ADMIN', 'CISO', 'LEGAL'],
-  },
-  { label: 'Settings', href: '/dashboard/settings', icon: <Settings className="w-4 h-4" /> },
-]
 
 const adminItems = [
   { label: 'System Monitor', href: '/admin', icon: <Shield className="w-4 h-4" /> },
@@ -55,17 +38,51 @@ const isAdmin = (role: string) => ['ADMIN', 'CISO', 'SOC_LEAD'].includes(role)
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
+  const [taskCount, setTaskCount] = useState(0)
 
-  const items = navItems.filter(i => !i.roles || i.roles.includes(profile.role))
+  useEffect(() => {
+    async function fetchCount() {
+      try {
+        const res = await fetch('/api/user/tasks')
+        if (!res.ok) return
+        const data = await res.json()
+        setTaskCount(data.tasks?.length ?? 0)
+      } catch {}
+    }
+
+    fetchCount()
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('sidebar-task-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incident_steps', filter: `assigned_role=eq.${profile.role}` },
+        fetchCount
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [profile.role])
+
+  const navItems = [
+    { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: 'My Tasks', href: '/dashboard/tasks', icon: <CheckSquare className="w-4 h-4" />, badge: taskCount > 0 ? taskCount : null },
+    { label: 'History', href: '/dashboard/history', icon: <History className="w-4 h-4" /> },
+    ...(['ADMIN', 'CISO', 'LEGAL'].includes(profile.role)
+      ? [{ label: 'Compliance', href: '/dashboard/compliance', icon: <Gavel className="w-4 h-4" />, badge: null }]
+      : []),
+    { label: 'Settings', href: '/dashboard/settings', icon: <Settings className="w-4 h-4" /> },
+  ]
 
   function isActive(href: string) {
-    if (href === '/dashboard') return pathname === '/dashboard'
+    if (href === '/dashboard' || href === '/admin') return pathname === href
     return pathname.startsWith(href)
   }
 
   const roleColor = ROLE_COLORS[profile.role] || 'var(--color-muted-foreground)'
 
-  function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  function NavLink({ href, icon, label, badge }: { href: string; icon: React.ReactNode; label: string; badge?: number | null }) {
     const active = isActive(href)
     return (
       <Link
@@ -79,7 +96,15 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <span style={{ color: active ? 'var(--color-primary)' : 'oklch(0.55 0.02 260)' }}>
           {icon}
         </span>
-        {label}
+        <span className="flex-1">{label}</span>
+        {badge != null && (
+          <span
+            className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+            style={{ background: 'var(--severity-high)', color: '#fff', minWidth: '18px', textAlign: 'center' }}
+          >
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
       </Link>
     )
   }
@@ -110,8 +135,8 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-2" style={{ color: 'var(--color-muted-foreground)' }}>
           Navigation
         </p>
-        {items.map(item => (
-          <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
+        {navItems.map(item => (
+          <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} badge={item.badge} />
         ))}
 
         {isAdmin(profile.role) && (

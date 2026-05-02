@@ -48,7 +48,7 @@ export function WorkflowViewer({ incidentId }: Props) {
       .then(r => r.json())
       .then(d => {
         const incident = d.incident || d
-        setSteps(incident.steps || [])
+        setSteps(d.steps || incident.steps || [])
         setIncidentTitle(incident.raw_input?.title || 'Untitled')
       })
       .catch(() => setSteps([]))
@@ -68,129 +68,139 @@ export function WorkflowViewer({ incidentId }: Props) {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="max-w-3xl mx-auto">
-        <section
-          className="rounded-xl overflow-hidden"
-          style={{ border: '1px solid var(--color-border)', background: 'var(--color-card)' }}
-        >
-          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
-            <GitBranch className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-            <div>
-              <h3 className="text-sm font-semibold">Workflow Steps</h3>
-              {incidentTitle && (
-                <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted-foreground)' }}>{incidentTitle}</div>
-              )}
-            </div>
-            <span className="ml-auto text-[11px] tabular-nums" style={{ color: 'var(--color-muted-foreground)' }}>
-              {loading ? '…' : `${steps.length} steps`}
-            </span>
+    <div className="h-full flex flex-col bg-background">
+      {/* Header */}
+      <div className="px-5 py-4 flex items-center gap-3 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)' }}>
+        <GitBranch className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+        <div>
+          <h3 className="text-sm font-semibold">Workflow Orchestration</h3>
+          {incidentTitle && (
+            <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted-foreground)' }}>{incidentTitle}</div>
+          )}
+        </div>
+        <span className="ml-auto text-[11px] tabular-nums font-medium" style={{ color: 'var(--color-muted-foreground)' }}>
+          {loading ? '…' : `${steps.length} steps`}
+        </span>
+      </div>
+
+      {/* Canvas Area (n8n style) */}
+      <div
+        className="flex-1 overflow-auto relative p-16"
+        style={{
+          background: 'color-mix(in oklab, var(--background) 95%, var(--muted))',
+          backgroundImage: 'radial-gradient(color-mix(in oklab, var(--border) 80%, transparent) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
+        {loading ? (
+          <div className="flex items-center gap-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-32 w-64 rounded-xl animate-pulse shrink-0" style={{ background: 'var(--color-muted)' }} />
+            ))}
           </div>
+        ) : steps.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <AlertCircle className="h-8 w-8 mx-auto mb-3" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 40%, transparent)' }} />
+            <div className="text-sm font-medium" style={{ color: 'var(--color-muted-foreground)' }}>No workflow steps found</div>
+            <div className="text-xs mt-1" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>Run a workflow or select an incident</div>
+          </div>
+        ) : (
+          <div className="flex items-center min-h-full w-max">
+            {steps.sort((a, b) => a.step_order - b.step_order).map((step, idx) => {
+              const meta = getStepMeta(step.status)
+              const Icon = meta.icon
+              const isLast = idx === steps.length - 1
 
-          <div className="p-5">
-            {loading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-14 rounded-lg animate-pulse" style={{ background: 'var(--color-muted)' }} />
-                ))}
-              </div>
-            ) : steps.length === 0 ? (
-              <div className="text-center py-12">
-                <AlertCircle className="h-8 w-8 mx-auto mb-3" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 30%, transparent)' }} />
-                <div className="text-sm" style={{ color: 'var(--color-muted-foreground)' }}>No workflow steps found</div>
-              </div>
-            ) : (
-              <div className="relative">
-                {/* Connector line */}
-                <div
-                  className="absolute left-5 top-8 bottom-8 w-px"
-                  style={{ background: 'color-mix(in oklab, var(--border) 60%, transparent)' }}
-                />
-                <div className="space-y-3">
-                  {steps.sort((a, b) => a.step_order - b.step_order).map((step, idx) => {
-                    const meta = getStepMeta(step.status)
-                    const Icon = meta.icon
-
-                    return (
+              return (
+                <div key={step.id} className="flex items-center shrink-0 fade-up" style={{ animationDelay: `${idx * 40}ms` }}>
+                  {/* Node Card */}
+                  <div
+                    className="w-[280px] rounded-xl shadow-md relative flex flex-col transition-transform hover:-translate-y-1"
+                    style={{
+                      background: 'var(--color-card)',
+                      border: `1px solid color-mix(in oklab, ${meta.color} 40%, var(--border))`,
+                      boxShadow: `0 4px 20px color-mix(in oklab, ${meta.color} 10%, transparent)`
+                    }}
+                  >
+                    {/* Left Port (Input) */}
+                    {idx > 0 && (
                       <div
-                        key={step.id}
-                        className="relative flex items-start gap-4 p-4 rounded-xl fade-up"
-                        style={{
-                          animationDelay: `${idx * 40}ms`,
-                          border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)',
-                          background: 'color-mix(in oklab, var(--muted) 20%, transparent)',
-                        }}
+                        className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full z-10"
+                        style={{ background: 'var(--color-card)', border: `2px solid var(--color-border)` }}
+                      />
+                    )}
+                    {/* Right Port (Output) */}
+                    {!isLast && (
+                      <div
+                        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full z-10"
+                        style={{ background: 'var(--color-card)', border: `2px solid color-mix(in oklab, ${meta.color} 80%, var(--border))` }}
+                      />
+                    )}
+
+                    {/* Node Header */}
+                    <div
+                      className="px-4 py-3 flex items-center gap-3 rounded-t-xl"
+                      style={{
+                        background: `color-mix(in oklab, ${meta.color} 8%, transparent)`,
+                        borderBottom: '1px solid color-mix(in oklab, var(--border) 50%, transparent)',
+                      }}
+                    >
+                      <div
+                        className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                        style={{ background: meta.color, color: 'var(--color-background)' }}
                       >
-                        {/* Step icon */}
-                        <div
-                          className="relative z-10 h-7 w-7 rounded-full grid place-items-center shrink-0"
-                          style={{
-                            background: `color-mix(in oklab, ${meta.color} 15%, transparent)`,
-                            border: `1px solid color-mix(in oklab, ${meta.color} 35%, transparent)`,
-                          }}
-                        >
-                          <Icon
-                            className={`h-3.5 w-3.5 ${step.status === 'RUNNING' ? 'animate-spin' : ''}`}
-                            style={{ color: meta.color }}
-                          />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-semibold">
-                              {step.step_type.replace(/_/g, ' ')}
-                            </span>
-                            <span
-                              className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                              style={{
-                                color: meta.color,
-                                background: `color-mix(in oklab, ${meta.color} 12%, transparent)`,
-                                border: `1px solid color-mix(in oklab, ${meta.color} 25%, transparent)`,
-                              }}
-                            >
-                              {step.status}
-                            </span>
-                            <span className="text-[10px] ml-auto" style={{ color: 'var(--color-muted-foreground)' }}>
-                              {relativeTime(step.created_at)}
-                            </span>
-                          </div>
-
-                          {typeof step.result?.message === 'string' && (
-                            <div
-                              className="text-xs mt-2 leading-relaxed p-2 rounded-lg"
-                              style={{
-                                background: 'color-mix(in oklab, var(--primary) 8%, transparent)',
-                                border: '1px solid color-mix(in oklab, var(--primary) 15%, transparent)',
-                                color: 'color-mix(in oklab, var(--foreground) 85%, transparent)',
-                              }}
-                            >
-                              {step.result.message}
-                            </div>
-                          )}
-
-                          {typeof step.result?.assignedRole === 'string' && (
-                            <div className="text-[11px] mt-1" style={{ color: 'var(--color-muted-foreground)' }}>
-                              Assigned to: <span className="font-medium">{step.result.assignedRole.replace(/_/g, ' ')}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Order badge */}
-                        <span
-                          className="text-[10px] font-mono shrink-0"
-                          style={{ color: 'var(--color-muted-foreground)' }}
-                        >
-                          #{step.step_order}
-                        </span>
+                        <Icon className={`h-4 w-4 ${step.status === 'RUNNING' ? 'animate-spin' : ''}`} />
                       </div>
-                    )
-                  })}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold truncate tracking-tight text-foreground">
+                          {step.step_type.replace(/_/g, ' ')}
+                        </div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: meta.color }}>
+                          {step.status}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-[10px] font-mono" style={{ color: 'var(--color-muted-foreground)' }}>
+                        #{step.step_order}
+                      </div>
+                    </div>
+
+                    {/* Node Body */}
+                    <div className="p-4">
+                      {typeof step.result?.message === 'string' && (
+                        <p className="text-[11px] leading-relaxed mb-3 line-clamp-3" style={{ color: 'color-mix(in oklab, var(--foreground) 90%, transparent)' }}>
+                          {step.result.message}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px dashed color-mix(in oklab, var(--border) 80%, transparent)' }}>
+                        <div className="text-[10px] font-medium" style={{ color: 'var(--color-muted-foreground)' }}>
+                          {typeof step.result?.assignedRole === 'string' ? step.result.assignedRole.replace(/_/g, ' ') : 'System Auto'}
+                        </div>
+                        <div className="text-[10px] font-mono" style={{ color: 'var(--color-muted-foreground)' }}>
+                          {relativeTime(step.created_at)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bezier Curve Connector */}
+                  {!isLast && (
+                    <svg className="w-16 h-16 shrink-0 overflow-visible" viewBox="0 0 64 64">
+                      <path
+                        d="M 0 32 C 32 32, 32 32, 64 32"
+                        fill="none"
+                        stroke={`color-mix(in oklab, ${meta.color} 50%, var(--border))`}
+                        strokeWidth="2"
+                        strokeDasharray={step.status === 'RUNNING' || step.status === 'PENDING' ? '4 4' : 'none'}
+                        className={step.status === 'RUNNING' ? 'animate-pulse' : ''}
+                      />
+                    </svg>
+                  )}
                 </div>
-              </div>
-            )}
+              )
+            })}
           </div>
-        </section>
+        )}
       </div>
     </div>
   )

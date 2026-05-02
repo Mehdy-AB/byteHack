@@ -31,6 +31,18 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <SessionProvider>{children}</SessionProvider>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            duration: 6000,
+            style: {
+              background: 'oklch(0.18 0.025 260)',
+              color: 'oklch(0.92 0.01 260)',
+              border: '1px solid oklch(0.28 0.02 260)',
+              fontSize: '13px',
+            },
+          }}
+        />
       </body>
     </html>
   );

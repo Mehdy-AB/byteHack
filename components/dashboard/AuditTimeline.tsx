@@ -23,8 +23,8 @@ interface AuditEntry {
 type EventKind = 'alert' | 'workflow' | 'assigned' | 'update'
 
 function inferKind(action: string): EventKind {
+  if (action.startsWith('STEP_') || action.includes('WORKFLOW') || action.includes('APPROVE') || action.includes('REJECT')) return 'workflow'
   if (action.includes('CREATED') || action.includes('OPENED')) return 'alert'
-  if (action.includes('STEP') || action.includes('WORKFLOW') || action.includes('APPROVE') || action.includes('REJECT')) return 'workflow'
   if (action.includes('ASSIGN') || action.includes('REASSIGN')) return 'assigned'
   return 'update'
 }
@@ -51,17 +51,27 @@ export function AuditTimeline({ incidentId }: Props) {
       .then(r => r.json())
       .then(d => {
         const incident = d.incident || d
-        // Combine audit_log + step events into a unified timeline
-        const auditEvents: AuditEntry[] = (incident.audit_log || []).map((e: any) => ({
-          id: e.id,
+        const auditLog: any[] = d.audit_log || incident.audit_log || []
+        const steps: any[] = d.steps || incident.steps || []
+
+        const auditEvents: AuditEntry[] = auditLog.map((e: any) => ({
+          id: `audit-${e.id}`,
           action: e.action,
-          performed_by: e.profiles?.name || e.performed_by || null,
+          performed_by: e.profiles?.name || e.actor || null,
           reason: e.reason || null,
           metadata: e.metadata || null,
           created_at: e.created_at,
         }))
 
-        // Add incident creation as first event
+        const stepEvents: AuditEntry[] = steps.map((s: any) => ({
+          id: `step-${s.id}`,
+          action: `STEP_${s.status}: ${s.step_type.replace(/_/g, ' ')}`,
+          performed_by: s.assigned_role ? s.assigned_role.replace(/_/g, ' ') : 'System',
+          reason: s.message || null,
+          metadata: null,
+          created_at: s.completed_at || s.started_at || s.created_at,
+        }))
+
         const creation: AuditEntry = {
           id: 'creation',
           action: 'INCIDENT_CREATED',
@@ -71,9 +81,10 @@ export function AuditTimeline({ incidentId }: Props) {
           created_at: incident.created_at,
         }
 
-        setEntries([creation, ...auditEvents].sort(
+        const all = [creation, ...auditEvents, ...stepEvents].sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        ))
+        )
+        setEntries(all)
       })
       .catch(() => setEntries([]))
       .finally(() => setLoading(false))

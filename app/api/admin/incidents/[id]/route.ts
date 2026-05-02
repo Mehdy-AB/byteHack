@@ -41,7 +41,7 @@ export async function GET(
       .from('audit_log')
       .select('id, actor, action, status, compliance, row_hash, created_at')
       .eq('incident_id', id)
-      .order('id', { ascending: true })
+      .order('created_at', { ascending: true })
 
     const assignedTo = incident.profiles || incident.assigned_to
 
@@ -54,13 +54,15 @@ export async function GET(
       steps: (steps || []).map((step: any) => ({
         id: step.id,
         step_id: step.step_id,
-        type: step.step_type,
+        step_type: step.step_type,
+        step_order: step.step_order,
         status: step.status,
         assigned_role: step.assigned_role,
         message: step.result?.message || null,
         result: step.result,
         started_at: step.started_at,
         completed_at: step.completed_at,
+        created_at: step.created_at,
       })),
       audit_log: auditLog || [],
     })
