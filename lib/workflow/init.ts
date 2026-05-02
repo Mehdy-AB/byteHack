@@ -34,8 +34,7 @@ export async function initializeIncidentWorkflow(payload: WorkflowPayload) {
       status: 'PENDING',
       assigned_role: step.assignedRole || null,
       assigned_user: step.assignedUser || null,
-      result: step,
-      message: step.message || null
+      result: step
     }))
 
     const { error: stepsError } = await supabase

@@ -5,6 +5,7 @@ export const WorkflowStepSchema = z.object({
   assignedRole: z.enum(['SOC_ANALYST', 'SOC_LEAD', 'CISO', 'IT_ADMIN', 'LEGAL', 'EXEC', 'ADMIN']).optional(),
   assignedUser: z.string().uuid().optional(),
   message: z.string().optional(),
+  catalogue: z.string().optional(),
   priorityLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional().default('MEDIUM'),
   scheduledTime: z.string().datetime().optional(),
 

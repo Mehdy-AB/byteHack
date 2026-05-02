@@ -79,7 +79,7 @@ export function AuditTimeline({ incidentId }: Props) {
           action: s.step_type.replace(/_/g, ' '),
           status: s.status,
           performed_by: s.assigned_role ? s.assigned_role.replace(/_/g, ' ') : 'System',
-          reason: s.message || null,
+          reason: s.result?.catalogue || s.result?.message || null,
           metadata: null,
           created_at: s.completed_at || s.started_at || s.created_at,
         }))

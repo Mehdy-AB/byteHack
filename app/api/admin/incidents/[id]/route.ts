@@ -64,7 +64,7 @@ export async function GET(
         assigned_role: step.assigned_role,
         assigned_user_name: step.profiles?.name || null,
         assigned_user_email: step.profiles?.email || null,
-        message: step.result?.message || null,
+        message: step.result?.catalogue || step.result?.message || null,
         result: step.result,
         started_at: step.started_at,
         completed_at: step.completed_at,
