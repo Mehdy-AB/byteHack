@@ -26,6 +26,12 @@ interface AnalyzeResponse {
   workflow: any
 }
 
+const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
+  <div className={`bg-card border border-border rounded-xl overflow-hidden ${className}`} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
+    {children}
+  </div>
+)
+
 export default function AIAnalyzerPage() {
   const [logs, setLogs] = useState('')
   const [loading, setLoading] = useState(false)
@@ -72,12 +78,6 @@ export default function AIAnalyzerPage() {
       setLoading(false)
     }
   }
-
-  const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
-    <div className={`bg-card border border-border rounded-xl overflow-hidden ${className}`} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
-      {children}
-    </div>
-  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
