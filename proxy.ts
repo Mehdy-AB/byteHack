@@ -1,4 +1,4 @@
-import { withAuth } from 'next-auth/middleware'
+import { withAuth, NextRequestWithAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
 const ALLOWED: Record<string, string[]> = {
@@ -8,11 +8,11 @@ const ALLOWED: Record<string, string[]> = {
   ANALYZE:     ['ADMIN', 'CISO', 'SOC_LEAD', 'SOC_ANALYST', 'IT_ADMIN'],
 }
 
-function deny(req: Parameters<Parameters<typeof withAuth>[0]>[0]) {
+function deny(req: NextRequestWithAuth) {
   return NextResponse.redirect(new URL('/unauthorized', req.url))
 }
 
-export default withAuth(
+const authMiddleware = withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl
     const role = req.nextauth.token?.role as string | undefined
@@ -33,6 +33,10 @@ export default withAuth(
     },
   }
 )
+
+export function proxy(req: any, event: any) {
+  return (authMiddleware as any)(req, event)
+}
 
 export const config = {
   matcher: ['/dashboard/:path*', '/admin/:path*'],
