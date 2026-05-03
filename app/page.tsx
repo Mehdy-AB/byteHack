@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/auth'
 import { Shield, Cpu, Activity, Zap, Lock, ChevronRight, ArrowRight, CheckCircle2, Globe, Server, Brain } from 'lucide-react'
 import { LandingWorkflowPreview } from '@/components/dashboard/LandingWorkflowPreview'
+import { Logo } from '@/components/Logo'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -11,12 +12,7 @@ export default async function Home() {
     <div className="min-h-screen flex flex-col mesh-bg selection:bg-primary/30">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between glass-dark border-b border-white/5">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-primary/20 grid place-items-center border border-primary/30">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Mythos</span>
-        </div>
+        <Logo showText />
         <div className="flex items-center gap-6">
           <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">Features</Link>
           <Link href="#compliance" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">Compliance</Link>
@@ -156,9 +152,8 @@ export default async function Home() {
       {/* Footer */}
       <footer className="mt-auto py-12 px-6 border-t border-white/5">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-2.5 opacity-50">
-            <Shield className="h-4 w-4" />
-            <span className="text-sm font-bold tracking-tight">Mythos</span>
+          <div className="opacity-50 grayscale hover:grayscale-0 transition-all">
+            <Logo className="h-6 w-6" showText />
           </div>
           <div className="text-muted-foreground text-xs font-medium">
             © 2024 Mythos Autonomous SOAR. All rights reserved.

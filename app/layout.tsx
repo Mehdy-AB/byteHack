@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Silent Fracture SOAR",
-  description: "Security Orchestration, Automation & Response Platform",
+  title: "Mythos | Autonomous SOAR",
+  description: "AI-Powered Security Orchestration, Automation & Response Platform",
 };
 
 export default function RootLayout({
