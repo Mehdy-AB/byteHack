@@ -34,9 +34,7 @@ const authMiddleware = withAuth(
   }
 )
 
-export function proxy(req: any, event: any) {
-  return (authMiddleware as any)(req, event)
-}
+export default authMiddleware
 
 export const config = {
   matcher: ['/dashboard/:path*', '/admin/:path*'],
