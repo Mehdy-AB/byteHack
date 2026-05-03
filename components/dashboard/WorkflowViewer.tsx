@@ -171,6 +171,18 @@ export function WorkflowViewer({ incidentId }: Props) {
                       boxShadow: `0 4px 20px color-mix(in oklab, ${meta.color} 10%, transparent)`
                     }}
                   >
+                    {/* Pulsing ring for WAITING_APPROVAL */}
+                    {step.status === 'WAITING_APPROVAL' && (
+                      <span
+                        className="absolute rounded-xl animate-ping pointer-events-none"
+                        style={{
+                          inset: '-3px',
+                          border: `2px solid ${meta.color}`,
+                          opacity: 0.45,
+                          animationDuration: '1.8s',
+                        }}
+                      />
+                    )}
                     {/* Left Port (Input) */}
                     {idx > 0 && (
                       <div

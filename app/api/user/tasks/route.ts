@@ -21,7 +21,6 @@ export async function GET(req: Request) {
     let query = supabase
       .from('incident_steps')
       .select('*, incidents(id, raw_input, severity, source)')
-      .eq('step_type', 'APPROVAL')
 
     if (filterStatus) {
       query = query.eq('status', filterStatus)

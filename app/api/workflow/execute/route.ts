@@ -6,16 +6,7 @@ import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
-function verifySecret(request: Request) {
-  const secret = request.headers.get('x-workflow-secret')
-  return secret === process.env.WORKFLOW_WEBHOOK_SECRET
-}
-
 export async function POST(request: Request) {
-  if (!verifySecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
     const json = await request.json()
 

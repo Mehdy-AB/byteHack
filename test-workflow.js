@@ -1,11 +1,6 @@
 require('dotenv').config({ path: '.env' });
 const { createClient } = require('@supabase/supabase-js');
 
-const secret = process.env.WORKFLOW_WEBHOOK_SECRET;
-if (!secret) {
-  console.error("❌ WORKFLOW_WEBHOOK_SECRET is missing from .env.local");
-  process.exit(1);
-}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -26,7 +21,7 @@ async function runTest() {
 
   // Find users for specific roles to simulate a real chain
   const tarekUser = profiles.find(p => p.name && p.name.toLowerCase().includes('tarek')) || profiles.find(p => p.role === 'SOC_ANALYST') || profiles[0];
-  const adminUser = profiles.find(p => p.role === 'ADMIN') || profiles[0];
+  const adminUser = profiles.find(p => p.email.includes('admin@byte.com')) || profiles.find(p => p.role === 'ADMIN') || profiles[0];
   const leadUser = profiles.find(p => p.role === 'SOC_LEAD') || profiles[0];
   const cisoUser = profiles.find(p => p.role === 'CISO') || profiles[0];
 
@@ -46,9 +41,9 @@ async function runTest() {
     steps: [
       {
         type: "APPROVAL",
-        assignedRole: tarekUser.role,
-        assignedUser: tarekUser.id,
-        message: "🚨 Critical: Potential APT beaconing detected. Please approve isolation and memory forensics.",
+        assignedRole: adminUser.role,
+        assignedUser: adminUser.id,
+        message: "🚨 Critical: Super Admin review required for APT response initiation.",
         priorityLevel: "CRITICAL"
       },
       {
@@ -81,7 +76,6 @@ async function runTest() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-workflow-secret': secret
       },
       body: JSON.stringify(payload)
     });

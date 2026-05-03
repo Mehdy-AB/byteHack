@@ -121,78 +121,30 @@ export async function processWorkflowSteps(incidentId: string) {
         .update({ status: 'RUNNING', started_at: new Date().toISOString() })
         .eq('id', step.id)
 
-      let stepStatus = 'SUCCESS'
+      // Every step type requires human sign-off before the chain continues.
+      // Notify the assignee, park at WAITING_APPROVAL, and stop — approveStep()
+      // in lib/actions/steps.ts will resume the engine when the user acts.
+      const slaMinutes = SLA_MINUTES[severity] ?? SLA_MINUTES.MEDIUM
+      const slaDeadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString()
 
-      try {
-        switch (step.step_type) {
-          case 'APPROVAL': {
-            stepStatus = 'WAITING_APPROVAL'
-            const slaMinutes = SLA_MINUTES[severity] ?? SLA_MINUTES.MEDIUM
-            const slaDeadline = new Date(Date.now() + slaMinutes * 60 * 1000).toISOString()
-            await supabase
-              .from('incident_steps')
-              .update({ status: 'WAITING_APPROVAL', sla_deadline: slaDeadline })
-              .eq('id', step.id)
-            await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
-
-            await supabase.from('audit_log').insert({
-              incident_id: incidentId,
-              step_id: step.id,
-              actor: 'WORKFLOW_ENGINE',
-              action: 'EXECUTE_APPROVAL',
-              status: 'WAITING_APPROVAL',
-              payload: { step_order: step.step_order },
-            })
-
-            // STOP — wait for human to Approve/Reject before continuing the chain
-            console.log(`⏸  Chain paused at step ${step.step_order || '?'} (APPROVAL) — waiting for human action.`)
-            return
-          }
-
-          case 'INTEGRATION':
-            console.log(`Executing INTEGRATION: ${payload.integration} against target ${payload.target}`)
-            await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
-            break
-
-          case 'WEBHOOK':
-            console.log(`Executing WEBHOOK to ${payload.target}`)
-            await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
-            break
-
-          case 'SCRIPT':
-            console.log(`Executing SCRIPT for incident ${incidentId}`)
-            await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
-            break
-
-          default:
-            console.log(`Unhandled step type: ${step.step_type}`)
-        }
-      } catch (err: any) {
-        stepStatus = 'FAILED'
-        console.error(`Step ${step.id} failed:`, err)
-        await supabase.from('incident_steps').update({ error_detail: err.message }).eq('id', step.id)
-      }
-
-      // Finalize the step
       await supabase
         .from('incident_steps')
-        .update({ status: stepStatus, completed_at: new Date().toISOString() })
+        .update({ status: 'WAITING_APPROVAL', sla_deadline: slaDeadline })
         .eq('id', step.id)
+
+      await notifyStepAssignee(supabase, step, incidentId, incidentTitle)
 
       await supabase.from('audit_log').insert({
         incident_id: incidentId,
         step_id: step.id,
         actor: 'WORKFLOW_ENGINE',
         action: `EXECUTE_${step.step_type}`,
-        status: stepStatus,
+        status: 'WAITING_APPROVAL',
         payload: { step_order: step.step_order },
       })
 
-      // If a step FAILED, stop the chain — don't process further steps
-      if (stepStatus === 'FAILED') {
-        console.log(`🛑 Chain halted at step ${step.step_order || '?'} (FAILED).`)
-        return
-      }
+      console.log(`⏸  Chain paused at step ${step.step_order || '?'} (${step.step_type}) — waiting for human action.`)
+      return
     }
 
     // Auto-resolve when no active steps remain
