@@ -37,6 +37,7 @@ export function useAssistant({
       const userMsg: Message = { role: "user", content: text }
       setMessages((prev) => [...prev, userMsg])
       setIsStreaming(true)
+      let assistantText = ""
 
       try {
         abortRef.current = new AbortController()
@@ -56,7 +57,6 @@ export function useAssistant({
 
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
-        let assistantText = ""
         let buffer = ""
         let currentEvent = ""
 
