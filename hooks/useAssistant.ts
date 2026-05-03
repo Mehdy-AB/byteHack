@@ -38,8 +38,6 @@ export function useAssistant({
       setMessages((prev) => [...prev, userMsg])
       setIsStreaming(true)
       let assistantText = ""
-
-      let assistantText = ""
       try {
         abortRef.current = new AbortController()
 
