@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel, Cpu, AlertTriangle, MessageSquare } from 'lucide-react'
+import { Logo } from './Logo'
 
 interface Profile {
   name: string | null
@@ -129,18 +130,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     >
       {/* Logo */}
       <div className="px-5 py-5" style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="h-8 w-8 rounded-lg grid place-items-center"
-            style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)', border: '1px solid color-mix(in oklab, var(--primary) 25%, transparent)' }}
-          >
-            <Shield className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold tracking-tight">Mythos</div>
-            <div className="text-[11px]" style={{ color: 'var(--color-muted-foreground)' }}>Autonomous SOAR</div>
-          </div>
-        </div>
+        <Logo showText className="h-8 w-8" />
       </div>
 
       {/* Nav */}
