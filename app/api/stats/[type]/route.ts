@@ -24,18 +24,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
           { count: pendingApprovals },
           { count: law1807Overdue },
           { count: totalLast7 },
-          { count: slaBreached },
+          { count: totalBreached },
         ] = await Promise.all([
+          // Total Incidents (All time)
           supabase.from('incidents').select('*', { count: 'exact', head: true }),
+          // Open Incidents
           supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
-          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('severity', 'CRITICAL').in('status', ['OPEN', 'CONTAINED']),
+          // Critical Open (Strictly CRITICAL + OPEN)
+          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('severity', 'CRITICAL').eq('status', 'OPEN'),
+          // Pending Approvals
           supabase.from('incident_steps').select('*', { count: 'exact', head: true }).eq('status', 'WAITING_APPROVAL'),
-          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('compliance_notified', false).lt('notify_72h_at', now.toISOString()).not('notify_72h_at', 'is', null),
-          supabase.from('incidents').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
-          supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('sla_breached', true).gte('created_at', sevenDaysAgo),
+          // Law 18-07 Overdue (72h notification missed)
+          supabase.from('incidents').select('*', { count: 'exact', head: true })
+            .eq('compliance_notified', false)
+            .lt('notify_72h_at', now.toISOString())
+            .not('notify_72h_at', 'is', null),
+          // Total in last 7 days
+          supabase.from('incidents').select('*', { count: 'exact', head: true })
+            .gte('created_at', sevenDaysAgo),
+          // SLA Breaches (Last 7 days)
+          supabase.from('incidents').select('*', { count: 'exact', head: true })
+            .eq('sla_breached', true)
+            .gte('created_at', sevenDaysAgo),
         ])
 
-        const slaBreachRate7d = totalLast7 ? Math.round(((slaBreached || 0) / totalLast7) * 100) / 100 : 0
+        const slaBreachRate7d = totalLast7 && totalLast7 > 0 
+          ? (Number(totalBreached || 0) / Number(totalLast7)) * 100 
+          : 0
 
         return NextResponse.json({
           total_incidents: totalIncidents || 0,
@@ -43,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
           critical_open: criticalOpen || 0,
           pending_approvals: pendingApprovals || 0,
           law_1807_overdue: law1807Overdue || 0,
-          sla_breach_rate_7d: slaBreachRate7d,
+          sla_breach_rate_7d: Number(slaBreachRate7d.toFixed(1)),
         })
       }
 

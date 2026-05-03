@@ -24,10 +24,26 @@ export function TopBar() {
   const [stats, setStats] = useState<Stats | null>(null)
 
   useEffect(() => {
-    fetch('/api/stats/summary')
-      .then(r => r.json())
-      .then(d => setStats(d.stats || d))
-      .catch(() => { })
+    let mounted = true
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats/summary')
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        if (mounted) {
+          setStats(data.stats || data)
+        }
+      } catch (err) {
+        console.error('Stats fetch failed:', err)
+      }
+    }
+
+    fetchStats()
+    const id = setInterval(fetchStats, 30_000)
+    return () => {
+      mounted = false
+      clearInterval(id)
+    }
   }, [])
 
   const bars: KpiBar[] = stats
