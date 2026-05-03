@@ -311,23 +311,6 @@ export function WorkflowViewer({ incidentId }: Props) {
             <div className="text-xs font-semibold truncate">{contextMenu.step.step_type.replace(/_/g, ' ')}</div>
           </div>
           <button
-            onClick={() => {
-              const taskInfo = {
-                task: contextMenu.step.step_type,
-                order: contextMenu.step.step_order,
-                status: contextMenu.step.status,
-                details: contextMenu.step.result?.message || 'No details'
-              }
-              const query = encodeURIComponent(JSON.stringify(taskInfo))
-              router.push(`/dashboard/analyze?explain=${query}`)
-              setContextMenu(null)
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:text-primary hover:bg-primary/10 transition-all group"
-          >
-            <Sparkles className="h-4 w-4 text-primary transition-transform group-hover:rotate-12" />
-            AI Task Analysis
-          </button>
-          <button
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-muted/50 transition-all"
             onClick={() => {
               navigator.clipboard.writeText(JSON.stringify(contextMenu.step, null, 2))

@@ -6,6 +6,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { Shield, Loader2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+import { Logo } from '@/components/Logo'
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -59,16 +61,11 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--color-background)' }}>
       <div className="w-full max-w-md">
         {/* Brand */}
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-            style={{ background: 'color-mix(in oklab, var(--primary) 15%, transparent)', border: '1px solid color-mix(in oklab, var(--primary) 25%, transparent)' }}
-          >
-            <Shield className="h-7 w-7" style={{ color: 'var(--color-primary)' }} />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">SF SOAR</h1>
-          <p className="text-xs mt-1 uppercase tracking-widest" style={{ color: 'var(--color-muted-foreground)' }}>
-            Security Operations Platform
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Logo className="h-16 w-16 mb-2" />
+          <h1 className="text-3xl font-black tracking-tighter">MYTHOS</h1>
+          <p className="text-[10px] mt-1 uppercase tracking-[0.3em] font-bold text-primary">
+            Autonomous SOAR Platform
           </p>
         </div>
 
@@ -151,8 +148,8 @@ function LoginForm() {
           </form>
         </div>
 
-        <p className="text-center text-[11px] mt-6" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>
-          Silent Fracture SOAR — Authorized Access Only
+        <p className="text-center text-[11px] mt-8" style={{ color: 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)' }}>
+          Mythos Autonomous SOAR — Authorized Access Only
         </p>
       </div>
     </div>
