@@ -247,7 +247,7 @@ export default function TasksPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">My Tasks</h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>Approval requests assigned to you</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>All workflow steps assigned to you — approve to continue the chain</p>
         </div>
         <button onClick={fetchTasks} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors"
           style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' }}>

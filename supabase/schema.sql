@@ -136,3 +136,27 @@ CREATE INDEX idx_audit_log_actor ON audit_log(actor);
 -- ALTER TABLE incident_steps ADD COLUMN IF NOT EXISTS priority INT DEFAULT 5;
 -- ALTER TABLE step_actions ADD COLUMN IF NOT EXISTS incident_id UUID REFERENCES incidents(id);
 -- ALTER TABLE step_actions ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- ── AI Assistant tables (used by api.py — run these in Supabase SQL editor) ──
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          TEXT,                          -- NextAuth user UUID or anonymous token
+  title            TEXT NOT NULL DEFAULT 'New chat',
+  suspected_attack TEXT,                          -- e.g. 'xss', 'sql_injection'
+  task_context     TEXT,                          -- raw incident log pasted by user
+  user_role        TEXT,                          -- e.g. 'SOC analyst'
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID REFERENCES chat_sessions(id) ON DELETE CASCADE NOT NULL,
+  role       TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content    TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS chat_sessions_user_idx    ON chat_sessions (user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS chat_messages_session_idx ON chat_messages (session_id, created_at);

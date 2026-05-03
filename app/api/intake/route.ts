@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { initializeIncidentWorkflow } from '@/lib/workflow/init'
+import { WorkflowPayloadSchema } from '@/lib/workflow/schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,39 +44,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
     }
 
-    // 4. Forward to n8n Webhook
-    const n8nUrl = process.env.N8N_WEBHOOK_URL
-    if (!n8nUrl) {
-      console.error('N8N_WEBHOOK_URL is not configured.')
-      // We still return 202 so Wazuh doesn't retry, but log the error
-      return NextResponse.json({ error: 'n8n integration not configured' }, { status: 500 })
+    // 4. Send to AI for Analysis
+    const backendUrl = process.env.BACKEND_API_URL
+    if (!backendUrl) {
+      console.error('BACKEND_API_URL is not configured.')
+      return NextResponse.json({ error: 'AI Backend not configured' }, { status: 500 })
     }
 
-    console.log(`Forwarding Wazuh alert to n8n: ${n8nUrl}`)
+    console.log(`Analyzing Wazuh alert via AI: ${backendUrl}/analyze`)
     
-    // We don't await the fetch response directly to avoid holding up the Wazuh webhook,
-    // but in serverless environments we should wait for it to finish.
-    const n8nResponse = await fetch(n8nUrl, {
+    const aiResponse = await fetch(`${backendUrl}/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: rawBody, // Forward the exact same JSON
+      body: JSON.stringify(wazuhAlert),
     })
 
-    if (!n8nResponse.ok) {
-      console.error(`n8n webhook failed with status: ${n8nResponse.status}`)
-      // Depending on requirements, we could return an error, but usually
-      // webhook ingestion returns 202 Accepted regardless of downstream success.
-    } else {
-      console.log('Successfully forwarded to n8n.')
+    if (!aiResponse.ok) {
+      console.error(`AI analysis failed with status: ${aiResponse.status}`)
+      return NextResponse.json({ error: 'AI analysis failed' }, { status: 502 })
     }
 
-    // 5. Return 202 Accepted back to Wazuh immediately
-    return NextResponse.json({ message: 'Alert received and forwarded to n8n' }, { status: 202 })
+    const analysisData = await aiResponse.json()
+
+    // 5. Initialize Workflow from AI Output
+    // The AI backend returns an object containing a 'workflow' property
+    if (analysisData.workflow) {
+      console.log('AI generated a workflow. Initializing incident...')
+      
+      const parsedWorkflow = WorkflowPayloadSchema.safeParse(analysisData.workflow)
+      if (parsedWorkflow.success) {
+        const incident = await initializeIncidentWorkflow(parsedWorkflow.data)
+        console.log(`Incident ${incident.id} successfully created and workflow started.`)
+        
+        return NextResponse.json({ 
+          message: 'Alert processed and workflow initiated', 
+          incidentId: incident.id 
+        }, { status: 201 })
+      } else {
+        console.warn('AI generated an invalid workflow schema:', parsedWorkflow.error)
+      }
+    }
+
+    // 6. Fallback or generic success if no workflow was generated
+    return NextResponse.json({ message: 'Alert received but no automated workflow generated' }, { status: 202 })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Intake Route Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

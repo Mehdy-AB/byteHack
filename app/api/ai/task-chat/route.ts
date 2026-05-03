@@ -1,22 +1,18 @@
 import { requireAuth } from '@/lib/auth'
+import { assistApiUrl } from '@/lib/assist-api'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: Request) {
-  const authResult = await requireAuth()
-  if ('error' in authResult) {
-    return Response.json({ error: authResult.error }, { status: authResult.status })
-  }
+// Per-task session memory — keeps multi-turn context alive within the server process.
+// Keyed by task.id so each workflow step gets its own conversation.
+const taskSessions = new Map<string, string>()
 
-  const webhookUrl = process.env.AI_CHAT_WEBHOOK_URL
-  if (!webhookUrl) {
-    return Response.json({ error: 'AI_CHAT_WEBHOOK_URL is not configured' }, { status: 503 })
-  }
+export async function POST(req: Request) {
+  const auth = await requireAuth()
+  if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
   let body: any
-  try {
-    body = await req.json()
-  } catch {
+  try { body = await req.json() } catch {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -25,86 +21,127 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Missing task or messages' }, { status: 400 })
   }
 
-  const slaLine = task.sla_expires_at
-    ? `- SLA Deadline: ${new Date(task.sla_expires_at).toLocaleString('en-GB')}`
-    : ''
-  const confidenceLine = task.context?.ai_confidence != null
-    ? `- AI Triage Confidence: ${(task.context.ai_confidence * 100).toFixed(1)}%`
-    : ''
+  const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user')
+  if (!lastUserMsg) return Response.json({ error: 'No user message found' }, { status: 400 })
 
-  const systemPrompt = `You are an expert SOAR (Security Orchestration, Automation, and Response) analyst AI embedded in the Silent Fracture SOAR platform. You are assisting a security analyst with a specific pending workflow step.
-
-CURRENT WORKFLOW STEP CONTEXT:
-- Incident: ${task.incident_title}
-- Incident ID: ${task.incident_id}
-- Step Type: ${task.type.replace(/_/g, ' ')}
-- Step Status: ${task.status}
-- Assigned Role: ${task.assigned_role?.replace(/_/g, ' ') || 'Unassigned'}
-- Severity: ${task.context?.severity || 'Unknown'}
-- Source System: ${task.context?.source || 'Unknown'}
-${task.context?.playbook_id ? `- Playbook: ${task.context.playbook_id}` : ''}
-${confidenceLine}
-${task.message ? `- Step Message: ${task.message}` : ''}
-${slaLine}
-
-INSTRUCTIONS:
-- Provide concise, actionable, expert-level security guidance specific to this step and incident.
-- Use markdown formatting: **bold** for key terms, bullet lists for steps, code blocks for commands.
-- When you have a concrete solution or clear recommendation ready, include the marker "**PROPOSED SOLUTION:**" on its own line before presenting it — this lets the analyst accept and queue it.
-- Be direct. Avoid generic advice. Reference the specific incident, step type, and context above.
-- If the user asks to improve a previous solution, refine it and again use "**PROPOSED SOLUTION:**" to present the improved version.`
-
-  const apiMessages = messages
-    .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-    .map((m: any) => ({ role: m.role, content: m.content }))
-
-  let webhookRes: Response
-  try {
-    webhookRes = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages, system: systemPrompt, task }),
-    })
-  } catch (err: any) {
-    return Response.json({ error: `Webhook unreachable: ${err.message}` }, { status: 502 })
+  let base: string
+  try { base = assistApiUrl() } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 503 })
   }
 
-  if (!webhookRes.ok) {
-    const errText = await webhookRes.text().catch(() => '')
-    return Response.json({ error: `Webhook error ${webhookRes.status}: ${errText}` }, { status: 502 })
-  }
+  const existingSession = taskSessions.get(task.id)
+  const isFirstTurn = !existingSession
 
-  const contentType = webhookRes.headers.get('content-type') || ''
-
-  // Streaming response — pass through directly
-  if (contentType.includes('text/event-stream') || contentType.includes('text/plain')) {
-    return new Response(webhookRes.body, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
-        'X-Accel-Buffering': 'no',
-      },
-    })
-  }
-
-  // JSON response — extract message text and stream it as plain text
-  const json = await webhookRes.json().catch(() => null)
-  const text: string =
-    json?.response ?? json?.message ?? json?.content ?? json?.text ?? json?.reply ??
-    (typeof json?.choices?.[0]?.message?.content === 'string' ? json.choices[0].message.content : null) ??
-    JSON.stringify(json)
-
-  const readable = new ReadableStream({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode(text))
-      controller.close()
-    },
+  const params = new URLSearchParams({
+    message: lastUserMsg.content,
+    user_id: auth.user!.id,
+    user_role: task.assigned_role || 'SOC_ANALYST',
   })
 
-  return new Response(readable, {
+  if (existingSession) {
+    params.set('session_id', existingSession)
+  } else {
+    params.set('task_context', buildTaskContext(task))
+    if (task.context?.severity) {
+      params.set('suspected_attack', task.context.severity.toLowerCase())
+    }
+  }
+
+  let assistRes: Response
+  try {
+    assistRes = await fetch(`${base}/assist/stream?${params}`)
+  } catch (err: any) {
+    return Response.json({ error: `AI backend unreachable: ${err.message}` }, { status: 502 })
+  }
+
+  if (!assistRes.ok) {
+    const errText = await assistRes.text().catch(() => '')
+    return Response.json(
+      { error: `AI backend error ${assistRes.status}: ${errText}` },
+      { status: 502 }
+    )
+  }
+
+  // Consume the full SSE stream server-side and extract the plain text reply.
+  // AIHelpPanel gets one complete chunk instead of token-by-token streaming.
+  const reader = assistRes.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let currentEvent = ''
+  let fullReply = ''
+
+  try {
+    outer: while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim()
+        } else if (line.startsWith('data: ')) {
+          const data = line.slice(6)
+          if (data === '[DONE]') break outer
+
+          if (currentEvent === 'meta') {
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.session_id && isFirstTurn) {
+                taskSessions.set(task.id, parsed.session_id)
+              }
+            } catch {}
+          } else if (currentEvent !== 'error') {
+            fullReply += data.replace(/\\n/g, '\n')
+          }
+          currentEvent = ''
+        } else if (line === '') {
+          currentEvent = ''
+        }
+      }
+    }
+  } catch { /* client disconnected */ }
+
+  const reply = fullReply ||
+    '⚠ The AI returned an empty response. Security content may have triggered a safety filter — try rephrasing.'
+
+  return new Response(reply, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
+      'Cache-Control': 'no-cache',
     },
   })
+}
+
+function buildTaskContext(task: any): string {
+  const lines = [
+    `# SYSTEM INSTRUCTION`,
+    `You are an expert Cybersecurity Analyst and SOAR Engineer. Your goal is to help the user resolve a specific workflow step.`,
+    `When providing solutions, follow this format:`,
+    `1. Briefly explain the security context of the detection.`,
+    `2. Evaluate the severity and impact.`,
+    `3. Provide an 'Improved Step Message' that is clear and actionable.`,
+    `4. Suggest execution parameters or mitigation steps.`,
+    `Use rich markdown: ### for headers, > [!IMPORTANT] for critical alerts, and code blocks for technical details.`,
+    `If a refined solution is ready, include the text 'PROPOSED SOLUTION' in your response.`,
+    ``,
+    `# TASK PAYLOAD`,
+    `Incident: ${task.incident_title}`,
+    `Incident ID: ${task.incident_id}`,
+    `Step Type: ${task.type?.replace(/_/g, ' ')}`,
+    `Step Status: ${task.status}`,
+    `Assigned Role: ${task.assigned_role?.replace(/_/g, ' ') || 'Unassigned'}`,
+    `Severity: ${task.context?.severity || 'Unknown'}`,
+    `Source: ${task.context?.source || 'Unknown'}`,
+  ]
+  if (task.context?.playbook_id) lines.push(`Playbook: ${task.context.playbook_id}`)
+  if (task.context?.ai_confidence != null) {
+    lines.push(`AI Confidence: ${(task.context.ai_confidence * 100).toFixed(1)}%`)
+  }
+  if (task.message) lines.push(`Step Message: ${task.message}`)
+  if (task.sla_expires_at) {
+    lines.push(`SLA Deadline: ${new Date(task.sla_expires_at).toLocaleString('en-GB')}`)
+  }
+  return lines.join('\n')
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { GitBranch, CheckCircle2, XCircle, Clock, Loader2, AlertCircle, ZoomIn, ZoomOut, Maximize2, Sparkles, Brain, Briefcase, User, Info, Terminal } from 'lucide-react'
+import { GitBranch, CheckCircle2, XCircle, Clock, Loader2, AlertCircle, ZoomIn, ZoomOut, Maximize2, Sparkles, Brain, Briefcase, User, Info, Terminal, ClipboardCheck, Zap, Globe, Code2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function relativeTime(s: string) {
@@ -28,16 +28,25 @@ interface Props {
   incidentId: string | null
 }
 
-const STEP_META: Record<string, { color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }> = {
-  COMPLETED: { color: 'var(--status-done)', icon: CheckCircle2 },
-  FAILED: { color: 'var(--severity-critical)', icon: XCircle },
-  WAITING_APPROVAL: { color: 'var(--severity-medium)', icon: Clock },
-  PENDING: { color: 'var(--color-muted-foreground)', icon: Loader2 },
-  RUNNING: { color: 'var(--color-primary)', icon: Loader2 },
+type LucideIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+
+const TYPE_ICON: Record<string, LucideIcon> = {
+  APPROVAL:    ClipboardCheck,
+  INTEGRATION: Zap,
+  WEBHOOK:     Globe,
+  SCRIPT:      Code2,
+}
+
+const STEP_META: Record<string, { color: string; icon: LucideIcon }> = {
+  COMPLETED:        { color: 'var(--status-done)',             icon: CheckCircle2 },
+  FAILED:           { color: 'var(--severity-critical)',       icon: XCircle      },
+  WAITING_APPROVAL: { color: 'var(--severity-medium)',         icon: Clock        },
+  PENDING:          { color: 'var(--color-muted-foreground)',  icon: Loader2      },
+  RUNNING:          { color: 'var(--color-primary)',           icon: Loader2      },
 }
 
 function getStepMeta(status: string) {
-  return STEP_META[status] || STEP_META.PENDING
+  return STEP_META[status] ?? STEP_META.PENDING
 }
 
 export function WorkflowViewer({ incidentId }: Props) {
@@ -171,6 +180,18 @@ export function WorkflowViewer({ incidentId }: Props) {
                       boxShadow: `0 4px 20px color-mix(in oklab, ${meta.color} 10%, transparent)`
                     }}
                   >
+                    {/* Pulsing ring for WAITING_APPROVAL */}
+                    {step.status === 'WAITING_APPROVAL' && (
+                      <span
+                        className="absolute rounded-xl animate-ping pointer-events-none"
+                        style={{
+                          inset: '-3px',
+                          border: `2px solid ${meta.color}`,
+                          opacity: 0.45,
+                          animationDuration: '1.8s',
+                        }}
+                      />
+                    )}
                     {/* Left Port (Input) */}
                     {idx > 0 && (
                       <div
@@ -198,7 +219,12 @@ export function WorkflowViewer({ incidentId }: Props) {
                         className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
                         style={{ background: meta.color, color: 'var(--color-background)' }}
                       >
-                        <Icon className={`h-4 w-4 ${step.status === 'RUNNING' ? 'animate-spin' : ''}`} />
+                        {(() => {
+                          const TypeIcon = TYPE_ICON[step.step_type]
+                          return TypeIcon
+                            ? <TypeIcon className="h-4 w-4" />
+                            : <Icon className={`h-4 w-4 ${step.status === 'RUNNING' ? 'animate-spin' : ''}`} />
+                        })()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-bold truncate tracking-tight text-foreground">

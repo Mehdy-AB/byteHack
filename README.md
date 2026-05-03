@@ -1,138 +1,178 @@
-# Silent Fracture SOAR: Technical Documentation
+# Silent Fracture SOAR
 
-A strictly serverless, high-performance Security Orchestration, Automation, and Response (SOAR) platform built on **Next.js 16 (App Router)** and powered by **Supabase**.
-
----
-
-## 1. Deep Architecture & System Logic
-
-Unlike traditional Node.js/Express backends with long-running daemons, Silent Fracture is entirely **serverless**. Execution happens on-demand via Vercel Edge/Node functions and Supabase's high-speed Postgres instance.
-
-### The Lifecycle of an Incident
-
-1. **Intake & Validation**: 
-   - An external service sends a JSON payload to `POST /api/workflow/execute`.
-   - The route verifies the `X-Workflow-Secret` cryptographic header.
-   - The payload is passed through a strict **Zod Schema** (`lib/workflow/schema.ts`). It explicitly validates compliance metadata like `playbook_id` and checks the exact `step_type`.
-2. **Database Staging**:
-   - The verified payload creates a parent row in the `incidents` table. The raw payload (including AI confidence scores) is permanently stored here.
-   - The array of `steps` from the payload is bulk-inserted into `incident_steps` with a status of `PENDING`.
-3. **Engine Dispatch**:
-   - The `processWorkflowSteps(incident_id)` function is fired asynchronously.
-   - **Critical Execution Safety**: The engine is wrapped in Vercel's `waitUntil()` function. This prevents the serverless environment from killing the asynchronous workflow midway through execution after the API has already returned a `202 Accepted` response.
-4. **Sequential Execution (`lib/workflow/engine.ts`)**:
-   - **Suspension Check:** The engine first queries the incident. If the status is `SUSPENDED`, the engine immediately halts.
-   - **Scheduling Check:** For each step, it checks the `scheduledTime` field. If the timestamp is in the future, the engine skips the step (leaving it `PENDING`).
-   - **Processing:** 
-     - Updates the step status to `RUNNING`.
-     - Switches logic based on `step_type`:
-       - `EMAIL` / `SMS`: Calls the **Resend** or **Twilio** APIs.
-       - `INTEGRATION` / `WEBHOOK` / `SCRIPT`: Executes external integrations (e.g., locking an MDM profile) using the provided `target` and `params`.
-       - `APPROVAL`: Queries the `profiles` table to resolve the email address of the `assignedUser` (or role) and sends an automated notification email, then halts.
-   - **State Resolution**: Updates the step to `SUCCESS` (or `WAITING_APPROVAL`).
-   - **Audit Hashing**: Writes the action to the `audit_log` table to establish the compliance chain.
+A serverless Security Orchestration, Automation, and Response (SOAR) platform built on **Next.js 16 (App Router)** and **Supabase**. An external AI tool sends a structured JSON workflow; the platform ingests it, stages the steps in the database, and drives sequential human-approved execution — pausing at each step until the assigned user signs off.
 
 ---
 
-## 2. End-to-End Execution Scenario
+## Prerequisites
 
-**Scenario: Ransomware Playbook (PB-003)**
-1. **Detection**: The Wazuh SIEM detects a ransomware IOC on a finance laptop. It forwards the logs to the Python AI Analysis service.
-2. **Analysis**: The AI identifies this as a `CRITICAL` threat, matches it to playbook `PB-003`, and generates a response plan. It POSTs the JSON payload to our Next.js `/api/workflow/execute` endpoint.
-3. **Ingestion**: Next.js validates the JSON. It creates Incident `#992`, logs the `playbook_id` as compliance evidence, and stages three steps: 
-   - `INTEGRATION` (Isolate Endpoint via CrowdStrike)
-   - `SMS` (Alert the CISO immediately)
-   - `APPROVAL` (Wait for SOC Lead to authorize a full domain-password reset).
-4. **Execution**: The `waitUntil()` wrapper triggers the engine. The engine fires off the `INTEGRATION` API call to isolate the laptop. It sends the `SMS`. It then sees the `APPROVAL` step, emails the `SOC_LEAD`, sets the step to `WAITING_APPROVAL`, and goes to sleep.
-5. **Human Intervention**: The SOC Lead logs into the dashboard. They read the incident details and click "Approve" on the pending task.
-6. **Resolution**: The Next.js Server Action `approveStep()` executes. It updates the step to `SUCCESS`, cryptographically hashes the SOC Lead's User ID into the `audit_log` to prove they authorized it, and calls `waitUntil(processWorkflowSteps)` to wake the engine back up and finish the remaining workflow.
+| Tool | Version |
+|------|---------|
+| Node.js | 18+ |
+| npm | 9+ |
+| Supabase account | [supabase.com](https://supabase.com) |
+| Resend account (email) | [resend.com](https://resend.com) — optional in dev |
+| Twilio account (SMS) | [twilio.com](https://twilio.com) — optional in dev |
 
 ---
 
-## 3. Detailed Data Models
+## Quick Start
 
-The database utilizes highly relational Supabase SQL. 
+### 1. Clone and install
 
-### `incidents`
-The root entity representing a security event.
-- **`status` (Enum):** `OPEN`, `CONTAINED`, `RESOLVED`, `CLOSED`, `SUSPENDED`, `ARCHIVED`. *(Note: Law 18-07 requires 7-year retention. Deleting incidents is strictly forbidden. Instead, they are moved to the `ARCHIVED` status)*.
-- **`severity` (Enum):** `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`.
-- **`raw_input` (JSONB):** Stores the exact immutable JSON payload.
-
-### `incident_steps`
-The individual execution blocks tied to an incident.
-- **`step_type` (String):** Maps to `EMAIL`, `SMS`, `APPROVAL`, `INTEGRATION`, `WEBHOOK`, `SCRIPT`.
-
-### `audit_log`
-A mathematically immutable ledger required for Law 18-07 compliance.
-- Supabase Row Level Security ensures **NO USER**, not even an `ADMIN`, has `UPDATE` or `DELETE` permissions on this table. It is strictly `INSERT` only.
-- **The Cryptographic Chain:** Every row calculates a `row_hash` using: `SHA256(incident_id + actor + action + status + prev_hash + payload)`. 
-
----
-
-## 4. Workflow JSON Payload Schema
-
-The external analysis service **must** post this exact structure to `/api/workflow/execute`.
-
-```json
-{
-  "playbook_id": "PB-003",
-  "playbook_version": "1.2",
-  "ai_confidence": 0.98,
-  "source": "WAZUH",
-  "severity": "CRITICAL",
-  "title": "Ransomware detection on Host XYZ",
-  "steps": [
-    {
-      "type": "INTEGRATION",
-      "integration": "crowdstrike_isolate",
-      "target": "DESKTOP-Finance-03",
-      "params": { "aggressive": true }
-    },
-    {
-      "type": "APPROVAL",
-      "assignedRole": "SOC_LEAD",
-      "message": "Do you authorize forcing a global password reset?",
-      "notifyOnAssign": true
-    }
-  ]
-}
+```bash
+git clone <repo-url>
+cd bytehack-new
+npm install
 ```
 
+### 2. Configure environment variables
+
+Copy the example file and fill in each value:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Open `.env.local` and set:
+
+```env
+# NextAuth — generate the secret with: openssl rand -base64 32
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=<your-random-secret>
+
+# Supabase (from Project Settings → API)
+NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...          # server-only, never expose to browser
+
+# Workflow ingestion secret — any long random string
+WORKFLOW_WEBHOOK_SECRET=change-me
+
+# Resend (email notifications) — skip in dev to use console mock
+RESEND_API_KEY=re_...
+
+# Twilio (SMS notifications) — skip in dev to use console mock
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1...
+```
+
+> **Tip:** If `RESEND_API_KEY` or Twilio credentials are absent, the notification functions fall back to `console.log` mock messages — no errors thrown in development.
+
+### 3. Set up Supabase
+
+#### a. Create a new Supabase project
+
+Go to [supabase.com](https://supabase.com), create a project, and copy the API credentials into `.env.local`.
+
+#### b. Run the schema
+
+In the Supabase Dashboard → **SQL Editor**, paste and run the full contents of [`supabase/schema.sql`](supabase/schema.sql). This creates all tables, enums, and indexes.
+
+#### c. Enable Supabase Auth
+
+In **Authentication → Providers**, make sure the **Email** provider is enabled. Disable email confirmation for development:
+
+- Authentication → Settings → **Disable email confirmations** (dev only)
+
+### 4. Create your first user
+
+Use the Supabase Dashboard → **Authentication → Users → Invite user** to create the first account, then:
+
+1. Open **Table Editor → profiles**
+2. Find the row for your user
+3. Set `role` to `ADMIN` and `is_active` to `true`
+
+All subsequent users can be managed through the platform's admin panel at `/admin/users`.
+
+### 5. Run the development server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and log in with the credentials you created.
+
 ---
 
-## 5. REST API Endpoint Reference
+## Available Scripts
 
-### Intake & User Endpoints
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `/api/workflow/execute` | `POST` | `X-Workflow-Secret` | Ingests JSON payload, creates DB rows, triggers engine via `waitUntil`. |
-| `/api/user/tasks` | `GET` | Authenticated JWT | Returns `PENDING` / `WAITING_APPROVAL` steps assigned to the caller. |
-
-### Admin Monitoring APIs
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `/api/admin/incidents` | `GET` | `SOC_LEAD+` | Supports URL queries: `?status=OPEN`, `?severity=CRITICAL`, `?sortBy=severity_score`, `?page=1` |
-| `/api/admin/steps` | `GET` | `SOC_LEAD+` | Supports URL queries: `?status=FAILED`, `?type=INTEGRATION`, `?incident_id=<uuid>` |
-
-### Compliance APIs
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `/api/compliance/chain` | `GET` | `CISO+` | Requires `?incident=<uuid>`. Server re-calculates all SHA-256 hashes to prove no database tampering has occurred. |
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server on port 3000 |
+| `npm run build` | Production build |
+| `npm run start` | Run production build |
+| `npm run lint` | ESLint check |
 
 ---
 
-## 6. Admin Server Actions (Compliance Guarded)
+## Environment Variables Reference
 
-Server Actions (`lib/actions/*.ts`) handle state mutation directly from the frontend, bypassing REST routes for speed.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXTAUTH_URL` | Yes | Full URL of the app (`http://localhost:3000` in dev) |
+| `NEXTAUTH_SECRET` | Yes | Random secret for JWT signing — `openssl rand -base64 32` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (browser-safe) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-only, bypasses RLS) |
+| `WORKFLOW_WEBHOOK_SECRET` | Yes | Shared secret sent by the external AI tool in `x-workflow-secret` header |
+| `RESEND_API_KEY` | No | Resend API key for email notifications |
+| `TWILIO_ACCOUNT_SID` | No | Twilio Account SID for SMS |
+| `TWILIO_AUTH_TOKEN` | No | Twilio Auth Token |
+| `TWILIO_PHONE_NUMBER` | No | Twilio sender phone number (E.164 format, e.g. `+12297851959`) |
+| `NEXT_PUBLIC_APP_URL` | No | Public URL used in notification links (falls back to `http://localhost:3000`) |
 
-### Standard Operations
-- **`approveStep(stepId, reason)`**: Analyst authorizes an `APPROVAL` step.
-- **`rejectStep(stepId, reason)`**: Analyst denies an `APPROVAL` step. Changes status to `FAILED`.
+---
 
-### Deep Administration (Overrides)
-- **`archiveIncident(incidentId)`**: Gracefully archives an incident. Hard-deletes are forbidden to preserve the audit trail.
-- **`correctStepPayload(stepId, correctedPayload, reason)`**: Replaces a malformed payload on a `PENDING` step. To maintain audit integrity, it inserts *both* the original and corrected payloads into the `audit_log` so auditors know exactly why the data was altered.
-- **`suspendWorkflow(incidentId)`** / **`resumeWorkflow(incidentId)`**: Halts or restarts the engine mid-execution.
-- **`rollbackStep(stepId)`**: Resets a `FAILED` or completed step back to `PENDING` to re-run it.
-- **`skipStep(stepId)`**: Forces the engine to abandon a step, marking it `SKIPPED`.
+## Sending a Test Workflow
+
+Once running, submit a test workflow from the terminal:
+
+```bash
+curl -X POST http://localhost:3000/api/workflow/execute \
+  -H "Content-Type: application/json" \
+  -H "x-workflow-secret: change-me" \
+  -d '{
+    "source": "Test",
+    "severity": "HIGH",
+    "title": "Test Incident",
+    "steps": [
+      {
+        "type": "APPROVAL",
+        "assignedRole": "SOC_ANALYST",
+        "message": "Please review and approve this test step."
+      }
+    ]
+  }'
+```
+
+Log in as a `SOC_ANALYST` user, go to **My Tasks**, and you will see the step waiting for approval.
+
+For the full external API reference see [`WORKFLOW_API.md`](WORKFLOW_API.md).
+
+---
+
+## Upgrading an Existing Database
+
+If you already have an older schema, run the migration statements at the bottom of [`supabase/schema.sql`](supabase/schema.sql) (they are commented as `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
+
+---
+
+## Project Structure
+
+```
+app/              Next.js App Router — pages and API routes
+components/       React UI components
+lib/
+  actions/        Next.js Server Actions (approve, reject, reassign…)
+  supabase/       Supabase client factories (server + browser)
+  workflow/       Engine, initializer, Zod schema
+  auth.ts         requireAuth() RBAC guard
+  notifications.ts  Resend + Twilio wrappers
+  types.ts        Shared TypeScript types
+supabase/
+  schema.sql      Full PostgreSQL schema
+```
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full system design.
