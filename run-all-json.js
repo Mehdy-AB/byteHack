@@ -8,14 +8,7 @@ const path = require('path');
  * Default directory: ./json
  */
 
-const secret = process.env.WORKFLOW_WEBHOOK_SECRET;
 const API_URL = 'http://localhost:3000/api/workflow/execute';
-
-if (!secret) {
-  console.error("❌ ERROR: WORKFLOW_WEBHOOK_SECRET is missing from .env");
-  console.log("Please ensure you have a .env file with the correct secret.");
-  process.exit(1);
-}
 
 async function runWorkflows() {
   // Use the directory provided as an argument, or default to './json'
@@ -57,8 +50,7 @@ async function runWorkflows() {
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-workflow-secret': secret
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });

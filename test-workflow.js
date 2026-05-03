@@ -1,11 +1,6 @@
 require('dotenv').config({ path: '.env' });
 const { createClient } = require('@supabase/supabase-js');
 
-const secret = process.env.WORKFLOW_WEBHOOK_SECRET;
-if (!secret) {
-  console.error("❌ WORKFLOW_WEBHOOK_SECRET is missing from .env.local");
-  process.exit(1);
-}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -81,7 +76,6 @@ async function runTest() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-workflow-secret': secret
       },
       body: JSON.stringify(payload)
     });
