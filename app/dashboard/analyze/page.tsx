@@ -87,7 +87,11 @@ function AIAnalyzerContent() {
       let body: any
       
       if (explainData) {
-        body = { mode: 'explain', taskData: explainData }
+        body = {
+          incident_type: explainData.task,
+          description: explainData.details,
+          tactic: `Step ${explainData.order} — ${explainData.status}`,
+        }
       } else {
         // Try to parse as JSON first, if it fails, send as a string in a wrapper
         try {
@@ -136,7 +140,7 @@ function AIAnalyzerContent() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" style={{ background: 'var(--color-primary)' }}></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" style={{ background: 'var(--color-primary)' }}></span>
           </span>
-          Gemini 1.5 Flash Active
+          RAG Pipeline Active
         </div>
       </div>
 

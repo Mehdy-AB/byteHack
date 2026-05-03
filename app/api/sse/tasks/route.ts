@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     const { data: steps } = await supabase
       .from('incident_steps')
       .select('id, step_type, status, assigned_role, result, incident_id, incidents(id, raw_input, severity, source)')
-      .in('status', ['PENDING', 'WAITING_APPROVAL'])
+      .eq('status', 'WAITING_APPROVAL')
 
     return (steps || []).filter((step: any) => {
       const assignedRole = step.result?.assignedRole || step.assigned_role
