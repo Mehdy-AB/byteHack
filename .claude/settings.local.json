@@ -11,7 +11,8 @@
       "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\supabase\" -ErrorAction SilentlyContinue)",
       "Bash(select-object FullName)",
       "PowerShell(Get-ChildItem -Recurse \"c:\\\\Users\\\\user\\\\Desktop\\\\bytehack\\\\supabase\" -ErrorAction SilentlyContinue | ForEach-Object {$_.FullName})",
-      "Bash(powershell -Command 'Get-PSDrive C | Select-Object @{N='\\\\''FreeMB'\\\\'';E={[math]::Round\\($_.Free/1MB,0\\)}}')"
+      "Bash(powershell -Command 'Get-PSDrive C | Select-Object @{N='\\\\''FreeMB'\\\\'';E={[math]::Round\\($_.Free/1MB,0\\)}}')",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\eflc\\\\Desktop\\\\bytehack-new\" -Recurse -File -Filter \"*.ts\" -o 'engine.ts','execute')"
     ],
     "additionalDirectories": [
       "c:\\Users\\user\\Desktop\\bytehack\\app\\api\\admin\\users",

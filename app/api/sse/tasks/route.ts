@@ -16,22 +16,31 @@ export async function GET(req: Request) {
   const { profile, user } = authResult
   const supabase = await createClient()
   const encoder = new TextEncoder()
-  const seenIds = new Set<string>()
-  let firstPoll = true
 
   async function queryTasks() {
     const { data: steps } = await supabase
       .from('incident_steps')
       .select('id, step_type, status, assigned_role, result, incident_id, incidents(id, raw_input, severity, source)')
-      .eq('step_type', 'APPROVAL')
       .in('status', ['PENDING', 'WAITING_APPROVAL'])
 
     return (steps || []).filter((step: any) => {
       const assignedRole = step.result?.assignedRole || step.assigned_role
-      const assignedUser = step.result?.assignedUser
-      if (assignedUser) return assignedUser === user.id
-      if (assignedRole) return assignedRole === profile.role
+      const assignedUser  = step.result?.assignedUser
+      if (assignedUser)  return assignedUser === user.id
+      if (assignedRole)  return assignedRole === profile.role
       return true
+    }).map((step: any) => {
+      const payload  = step.result || {}
+      const incident = step.incidents || {}
+      return {
+        id:             step.id,
+        incident_title: incident.raw_input?.title || 'Unnamed Incident',
+        type:           step.step_type,
+        severity:       incident.severity || 'MEDIUM',
+        message:        payload.catalogue || payload.message || null,
+        status:         step.status,
+        requested_at:   step.created_at ?? null,
+      }
     })
   }
 
@@ -47,65 +56,21 @@ export async function GET(req: Request) {
       async function poll() {
         try {
           const tasks = await queryTasks()
-          send('task-count', { count: tasks.length })
-
-          for (const step of tasks) {
-            if (!seenIds.has(step.id)) {
-              if (!firstPoll) {
-                const payload = step.result || {}
-                const incident = (step as any).incidents || {}
-                send('task-notify', {
-                  id: step.id,
-                  incident_title: incident.raw_input?.title || 'Unnamed Incident',
-                  type: step.step_type,
-                  severity: incident.severity || 'MEDIUM',
-                  message: payload.catalogue || payload.message || null,
-                })
-              }
-              seenIds.add(step.id)
-            }
-          }
-          firstPoll = false
+          send('tasks', { tasks })
         } catch {}
       }
 
-      // Initial data — sent immediately on connect
+      // Immediate snapshot on connect so client hydrates right away
       await poll()
 
-      // Realtime subscription — instant push when any incident_step changes for this role
-      const channel = supabase
-        .channel(`sse-tasks-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'incident_steps',
-            filter: `assigned_role=eq.${profile.role}`,
-          },
-          () => { poll() }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'incident_steps',
-            filter: `assigned_user=eq.${user.id}`,
-          },
-          () => { poll() }
-        )
-        .subscribe()
-
-      // Fallback poll every 30 s in case realtime misses anything
-      const fallbackTimer = setInterval(poll, 30_000)
+      // Poll every 3 s — fast enough to feel instant, no server-side WS needed
+      const pollTimer      = setInterval(poll, 3_000)
       const heartbeatTimer = setInterval(() => send('heartbeat', null), 20_000)
 
       req.signal.addEventListener('abort', () => {
         closed = true
-        clearInterval(fallbackTimer)
+        clearInterval(pollTimer)
         clearInterval(heartbeatTimer)
-        supabase.removeChannel(channel)
         try { controller.close() } catch {}
       })
     },
@@ -113,9 +78,9 @@ export async function GET(req: Request) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      'Content-Type':    'text/event-stream',
+      'Cache-Control':   'no-cache, no-transform',
+      'Connection':      'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })

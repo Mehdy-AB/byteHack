@@ -9,14 +9,36 @@ export async function GET() {
   if ('error' in authResult) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
 
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', authResult.user.id)
-    .single()
+  const userId = authResult.user.id
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ profile: data })
+  const [profileRes, approvalsRes, rejectionsRes] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase
+      .from('step_actions')
+      .select('id', { count: 'exact', head: true })
+      .eq('actor_id', userId)
+      .eq('action', 'APPROVE'),
+    supabase
+      .from('step_actions')
+      .select('id', { count: 'exact', head: true })
+      .eq('actor_id', userId)
+      .eq('action', 'REJECT'),
+  ])
+
+  if (profileRes.error) return NextResponse.json({ error: profileRes.error.message }, { status: 500 })
+
+  const total_approvals       = approvalsRes.count  ?? 0
+  const total_rejections      = rejectionsRes.count ?? 0
+  const total_tasks_completed = total_approvals + total_rejections
+
+  return NextResponse.json({
+    profile: {
+      ...profileRes.data,
+      total_approvals,
+      total_rejections,
+      total_tasks_completed,
+    },
+  })
 }
 
 export async function PUT(req: Request) {

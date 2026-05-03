@@ -29,8 +29,14 @@ interface AnalyzeResponse {
 
 const Card = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => (
   <div 
-    className={`bg-card border border-border rounded-xl overflow-hidden ${className}`} 
-    style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', ...style }}
+    className={`bg-card rounded-xl overflow-hidden ${className}`} 
+    style={{ 
+      background: 'var(--color-card)', 
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: 'var(--color-border)', 
+      ...style 
+    }}
   >
     {children}
   </div>
