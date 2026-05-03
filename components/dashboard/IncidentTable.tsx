@@ -85,9 +85,24 @@ export function IncidentTable({ onSelect }: Props) {
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold">Incidents</h1>
-        <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>{pagination.total} total</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Incidents</h1>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-muted-foreground)' }}>{pagination.total} total</p>
+        </div>
+        <button
+          onClick={() => fetchIncidents()}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-50"
+          style={{ 
+            background: 'color-mix(in oklab, var(--muted) 30%, transparent)', 
+            color: 'var(--color-foreground)', 
+            border: '1px solid var(--color-border)' 
+          }}
+        >
+          <RotateCcw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : 'text-primary'}`} style={loading ? {} : { color: 'var(--color-primary)' }} />
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}

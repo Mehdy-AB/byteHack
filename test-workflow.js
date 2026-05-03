@@ -25,16 +25,15 @@ async function runTest() {
   }
 
   // Find users for specific roles to simulate a real chain
+  const tarekUser = profiles.find(p => p.name && p.name.toLowerCase().includes('tarek')) || profiles.find(p => p.role === 'SOC_ANALYST') || profiles[0];
   const adminUser = profiles.find(p => p.role === 'ADMIN') || profiles[0];
-  const analystUser = profiles.find(p => p.role === 'SOC_ANALYST') || profiles[0];
   const leadUser = profiles.find(p => p.role === 'SOC_LEAD') || profiles[0];
   const cisoUser = profiles.find(p => p.role === 'CISO') || profiles[0];
 
   console.log("\n🎯 Assigning tasks across different users:");
-  console.log(`   Step 1 (IT/Admin)  -> ${adminUser.email}`);
-  console.log(`   Step 2 (Analyst)   -> ${analystUser.email}`);
-  console.log(`   Step 3 (Lead)      -> ${leadUser.email}`);
-  console.log(`   Step 4 (CISO)      -> ${cisoUser.email}\n`);
+  console.log(`   Step 1 (Tarek/Analyst) -> ${tarekUser.name} (${tarekUser.email})`);
+  console.log(`   Step 2 (Admin)         -> ${adminUser.email}`);
+  console.log(`   Step 3 (CISO)          -> ${cisoUser.email}\n`);
 
   // 2. Build a realistic workflow payload that exercises ALL step types
   const payload = {
@@ -46,36 +45,29 @@ async function runTest() {
     ai_confidence: 0.92,
     steps: [
       {
-        type: "INTEGRATION",
-        integration: "CrowdStrike EDR",
-        target: "CORE-SRV-07",
-        params: { action: "ISOLATE_HOST", reason: "APT C2 beacon detected" },
-        assignedRole: adminUser.role,
-        assignedUser: adminUser.id,
-        message: "Isolate CORE-SRV-07 from the network immediately.",
+        type: "APPROVAL",
+        assignedRole: tarekUser.role,
+        assignedUser: tarekUser.id,
+        message: "🚨 Critical: Potential APT beaconing detected. Please approve isolation and memory forensics.",
         priorityLevel: "CRITICAL"
       },
       {
-        type: "SCRIPT",
-        message: "Execute memory forensics collection on CORE-SRV-07",
-        assignedRole: analystUser.role,
-        assignedUser: analystUser.id,
-        priorityLevel: "HIGH"
-      },
-      {
-        type: "APPROVAL",
-        assignedRole: leadUser.role,
-        assignedUser: leadUser.id,
-        message: "Review forensic findings and approve escalation to CISO.",
+        type: "INTEGRATION",
+        integration: "CrowdStrike EDR",
+        target: "CORE-SRV-07",
+        params: { action: "ISOLATE_HOST", reason: "Approved by SOC Analyst" },
+        assignedRole: adminUser.role,
+        assignedUser: adminUser.id,
+        message: "Automated Host Isolation on CORE-SRV-07",
         priorityLevel: "CRITICAL"
       },
       {
         type: "WEBHOOK",
         target: "https://hooks.slack.com/example",
-        params: { channel: "#incident-response", text: "APT intrusion confirmed on CORE-SRV-07" },
+        params: { channel: "#incident-response", text: "APT response initiated." },
         assignedRole: cisoUser.role,
         assignedUser: cisoUser.id,
-        message: "Notify the SOC Slack channel about the confirmed intrusion.",
+        message: "Notify management about response actions.",
         priorityLevel: "HIGH"
       }
     ]

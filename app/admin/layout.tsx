@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .single()
 
   if (!profile || !profile.is_active) redirect('/login')
-  if (!['ADMIN', 'CISO', 'SOC_LEAD'].includes(profile.role)) redirect('/dashboard')
+  if (!['ADMIN', 'CISO', 'SOC_LEAD'].includes(profile.role)) redirect('/unauthorized')
 
   return (
     <div className="flex h-screen overflow-hidden">

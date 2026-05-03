@@ -4,8 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, CheckSquare, Shield, Settings, LogOut, History, Users, Activity, Gavel, Cpu, AlertTriangle } from 'lucide-react'
+import {
+  LayoutDashboard, CheckSquare, Shield, Settings, LogOut,
+  History, Users, Activity, Gavel, Cpu,
+} from 'lucide-react'
 
 interface Profile {
   name: string | null
@@ -13,67 +15,67 @@ interface Profile {
   email: string
 }
 
-const adminItems = [
-  { label: 'System Monitor', href: '/admin', icon: <Shield className="w-4 h-4" /> },
-  { label: 'Users', href: '/admin/users', icon: <Users className="w-4 h-4" /> },
-  { label: 'Audit Log', href: '/admin/audit', icon: <Activity className="w-4 h-4" /> },
-]
+const ROLE_COLORS: Record<string, string> = {
+  ADMIN:       'var(--severity-critical)',
+  CISO:        'oklch(0.7 0.2 310)',
+  SOC_LEAD:    'var(--severity-high)',
+  SOC_ANALYST: 'var(--color-primary)',
+  IT_ADMIN:    'oklch(0.74 0.18 180)',
+  LEGAL:       'var(--severity-medium)',
+  EXEC:        'oklch(0.7 0.2 290)',
+}
 
 function getInitials(name: string | null, email: string) {
   if (name) return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   return email.slice(0, 2).toUpperCase()
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  ADMIN: 'var(--severity-critical)',
-  CISO: 'oklch(0.7 0.2 310)',
-  SOC_LEAD: 'var(--severity-high)',
-  SOC_ANALYST: 'var(--color-primary)',
-  IT_ADMIN: 'oklch(0.74 0.18 180)',
-  LEGAL: 'var(--severity-medium)',
-  EXEC: 'oklch(0.7 0.2 290)',
-}
-
-const isAdmin = (role: string) => ['ADMIN', 'CISO', 'SOC_LEAD'].includes(role)
+// Route-level permission groups — must stay in sync with middleware.ts
+const CAN_ANALYZE   = ['ADMIN', 'CISO', 'SOC_LEAD', 'SOC_ANALYST', 'IT_ADMIN']
+const CAN_COMPLY    = ['ADMIN', 'CISO', 'LEGAL']
+const CAN_ADMIN     = ['ADMIN', 'CISO', 'SOC_LEAD']
+const CAN_USERS     = ['ADMIN', 'CISO']
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
   const [taskCount, setTaskCount] = useState(0)
 
   useEffect(() => {
-    async function fetchCount() {
-      try {
-        const res = await fetch('/api/user/tasks')
-        if (!res.ok) return
-        const data = await res.json()
-        setTaskCount(data.tasks?.length ?? 0)
-      } catch {}
+    // sf:task-count is dispatched by NotificationsProvider from the SSE stream
+    function onTaskCount(e: Event) {
+      setTaskCount((e as CustomEvent<{ count: number }>).detail.count)
     }
-
-    fetchCount()
-
-    const supabase = createClient()
-    const channel = supabase
-      .channel('sidebar-task-count')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incident_steps', filter: `assigned_role=eq.${profile.role}` },
-        fetchCount
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [profile.role])
+    // sf:task-resolved gives an immediate optimistic decrement
+    function onTaskResolved() {
+      setTaskCount(c => Math.max(0, c - 1))
+    }
+    window.addEventListener('sf:task-count', onTaskCount)
+    window.addEventListener('sf:task-resolved', onTaskResolved)
+    return () => {
+      window.removeEventListener('sf:task-count', onTaskCount)
+      window.removeEventListener('sf:task-resolved', onTaskResolved)
+    }
+  }, [])
 
   const navItems = [
-    { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { label: 'My Tasks', href: '/dashboard/tasks', icon: <CheckSquare className="w-4 h-4" />, badge: taskCount > 0 ? taskCount : null },
-    { label: 'History', href: '/dashboard/history', icon: <History className="w-4 h-4" /> },
-    ...(['ADMIN', 'CISO', 'LEGAL'].includes(profile.role)
+    { label: 'Dashboard',   href: '/dashboard',            icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: 'My Tasks',    href: '/dashboard/tasks',      icon: <CheckSquare className="w-4 h-4" />, badge: taskCount > 0 ? taskCount : null },
+    { label: 'History',     href: '/dashboard/history',    icon: <History className="w-4 h-4" /> },
+    ...(CAN_COMPLY.includes(profile.role)
       ? [{ label: 'Compliance', href: '/dashboard/compliance', icon: <Gavel className="w-4 h-4" />, badge: null }]
       : []),
-    { label: 'AI Analyzer', href: '/dashboard/analyze', icon: <Cpu className="w-4 h-4" /> },
-    { label: 'Settings', href: '/dashboard/settings', icon: <Settings className="w-4 h-4" /> },
+    ...(CAN_ANALYZE.includes(profile.role)
+      ? [{ label: 'AI Analyzer', href: '/dashboard/analyze', icon: <Cpu className="w-4 h-4" /> }]
+      : []),
+    { label: 'Settings',    href: '/dashboard/settings',   icon: <Settings className="w-4 h-4" /> },
+  ]
+
+  const adminItems = [
+    { label: 'System Monitor', href: '/admin',       icon: <Shield className="w-4 h-4" /> },
+    ...(CAN_USERS.includes(profile.role)
+      ? [{ label: 'Users', href: '/admin/users', icon: <Users className="w-4 h-4" /> }]
+      : []),
+    { label: 'Audit Log',   href: '/admin/audit',    icon: <Activity className="w-4 h-4" /> },
   ]
 
   function isActive(href: string) {
@@ -137,10 +139,10 @@ export default function Sidebar({ profile }: { profile: Profile }) {
           Navigation
         </p>
         {navItems.map(item => (
-          <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} badge={item.badge} />
+          <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} badge={'badge' in item ? item.badge : null} />
         ))}
 
-        {isAdmin(profile.role) && (
+        {CAN_ADMIN.includes(profile.role) && (
           <>
             <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mt-5 mb-2" style={{ color: 'var(--color-muted-foreground)' }}>
               Administration
