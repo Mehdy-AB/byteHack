@@ -211,7 +211,14 @@ function TaskCard({ task, onAction, onAIHelp }: { task: Task; onAction: () => vo
   )
 }
 
-const STATUS_OPTIONS = ['', 'PENDING', 'WAITING_APPROVAL', 'COMPLETED', 'FAILED']
+const STATUS_OPTIONS: [string, string][] = [
+  ['',                 'Active — Awaiting Approval'],
+  ['WAITING_APPROVAL', 'Waiting Approval'],
+  ['SUCCESS',          'Completed'],
+  ['FAILED',           'Rejected / Failed'],
+  ['SKIPPED',          'Skipped'],
+  ['SUSPENDED',        'Suspended'],
+]
 const SEVERITY_OPTIONS = ['', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 const sel: React.CSSProperties = { background: 'color-mix(in oklab, var(--muted) 40%, transparent)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)', borderRadius: '0.5rem', padding: '6px 10px', fontSize: '12px' }
 
@@ -257,7 +264,7 @@ export default function TasksPage() {
 
       <div className="rounded-xl p-4 mb-5 flex flex-wrap gap-3 items-end" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
         {[
-          { label: 'Status', value: status, set: setStatus, opts: STATUS_OPTIONS.map(s => [s, s || 'All Relevant']) },
+          { label: 'Status', value: status, set: setStatus, opts: STATUS_OPTIONS },
           { label: 'Severity', value: severity, set: setSeverity, opts: SEVERITY_OPTIONS.map(s => [s, s || 'All Severities']) },
           { label: 'Sort By', value: sortBy, set: setSortBy, opts: [['requested_at','Date Requested'],['severity','Severity']] },
           { label: 'Order', value: order, set: setOrder, opts: [['desc','Descending'],['asc','Ascending']] },

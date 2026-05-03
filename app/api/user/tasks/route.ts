@@ -22,12 +22,11 @@ export async function GET(req: Request) {
       .from('incident_steps')
       .select('*, incidents(id, raw_input, severity, source)')
 
-    if (filterStatus) {
+    const VALID_STATUSES = ['WAITING_APPROVAL', 'SUCCESS', 'FAILED', 'SKIPPED', 'SUSPENDED', 'PENDING', 'RUNNING']
+
+    if (filterStatus && VALID_STATUSES.includes(filterStatus)) {
       query = query.eq('status', filterStatus)
     } else {
-      // Only show steps the engine has actively parked for human action.
-      // PENDING steps are future steps not yet reached — showing them lets
-      // users approve out of order, which breaks the sequential chain.
       query = query.eq('status', 'WAITING_APPROVAL')
     }
 
