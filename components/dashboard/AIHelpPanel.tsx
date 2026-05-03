@@ -32,10 +32,40 @@ interface Message {
 
 function renderMarkdown(text: string) {
   return text
+    // Headers
+    .replace(/^### (.*$)/gim, '<h3 style="font-size:13px;font-weight:700;margin:12px 0 6px;color:var(--color-primary)">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 style="font-size:14px;font-weight:700;margin:16px 0 8px;color:var(--foreground)">$1</h2>')
+    
+    // Alerts (GitHub style)
+    .replace(/^> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\n([\s\S]*?)(?=\n\n|\n$|$)/gim, (match, type, content) => {
+      const colors: Record<string, string> = {
+        NOTE: 'var(--color-primary)',
+        TIP: 'var(--status-done)',
+        IMPORTANT: 'oklch(0.7 0.2 310)',
+        WARNING: 'var(--severity-medium)',
+        CAUTION: 'var(--severity-critical)'
+      }
+      const color = colors[type] || 'var(--color-primary)'
+      return `<div style="margin:10px 0;padding:10px 14px;border-left:3px solid ${color};background:color-mix(in oklab, ${color} 8%, transparent);border-radius:4px;font-size:11px"><strong style="color:${color};display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;font-size:9px">${type}</strong>${content}</div>`
+    })
+
+    // Bold/Italic
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre style="background:rgba(255,255,255,0.05);padding:10px 12px;border-radius:6px;font-size:10px;margin:6px 0;overflow-x:auto;border:1px solid rgba(255,255,255,0.08)">$1</pre>')
-    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10px">$1</code>')
-    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    
+    // Code blocks
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:6px;font-size:10px;margin:8px 0;overflow-x:auto;border:1px solid rgba(255,255,255,0.1);font-family:monospace;white-space:pre-wrap;word-break:break-all">$1</pre>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10px;color:var(--color-primary)">$1</code>')
+    
+    // Lists
+    .replace(/^\* (.*$)/gim, '<div style="display:flex;gap:8px;margin-bottom:4px"><span style="color:var(--color-primary)">•</span><span>$1</span></div>')
+    .replace(/^\d\. (.*$)/gim, '<div style="display:flex;gap:8px;margin-bottom:4px"><span style="color:var(--color-primary);font-weight:700">$&</span></div>') // Simple hack for numbered lists
+    
+    // Horizontal rule
+    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--color-border);margin:12px 0"/>')
+    
+    // Newlines
+    .replace(/\n\n/g, '<div style="height:8px"></div>')
     .replace(/\n/g, '<br/>')
 }
 
@@ -66,18 +96,56 @@ export function AIHelpPanel({ task, onClose }: Props) {
 
   const isExpiredSla = task.sla_expires_at && new Date(task.sla_expires_at) < new Date()
 
+  // Load history on mount
   useEffect(() => {
-    setMessages([{
-      id: 'intro',
-      role: 'assistant',
-      content: `I'm ready to help with the **${task.type.replace(/_/g, ' ')}** step on incident **${task.incident_title}**.\n\nDescribe what you need — a recommended action, risk assessment, or anything about this step.`,
-    }])
-    setSolutionAccepted(false)
+    const saved = localStorage.getItem(`sf:task-chat:${task.id}`)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setMessages(parsed)
+        // Also restore solution status if any message has it
+        if (parsed.some((m: Message) => m.hasSolution)) {
+          setSolutionAccepted(localStorage.getItem(`sf:task-chat-accepted:${task.id}`) === 'true')
+        }
+      } catch (e) {
+        console.error('Failed to load chat history', e)
+      }
+    } else {
+      setMessages([{
+        id: 'intro',
+        role: 'assistant',
+        content: `I'm ready to help with the **${task.type.replace(/_/g, ' ')}** step on incident **${task.incident_title}**.\n\nDescribe what you need — a recommended action, risk assessment, or anything about this step.`,
+      }])
+    }
+    
     setSolutionDeclined(false)
     setExecuted(false)
     setInput('')
     return () => { abortRef.current?.abort() }
   }, [task.id])
+
+  // Save history whenever messages change
+  useEffect(() => {
+    if (messages.length > 0 && messages[0].id !== 'intro' || messages.length > 1) {
+      localStorage.setItem(`sf:task-chat:${task.id}`, JSON.stringify(messages))
+    }
+  }, [messages, task.id])
+
+  // Save acceptance state
+  useEffect(() => {
+    localStorage.setItem(`sf:task-chat-accepted:${task.id}`, String(solutionAccepted))
+  }, [solutionAccepted, task.id])
+
+  function clearHistory() {
+    localStorage.removeItem(`sf:task-chat:${task.id}`)
+    localStorage.removeItem(`sf:task-chat-accepted:${task.id}`)
+    setMessages([{
+      id: 'intro',
+      role: 'assistant',
+      content: `Chat cleared. How else can I help with this **${task.type.replace(/_/g, ' ')}** step?`,
+    }])
+    setSolutionAccepted(false)
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -199,6 +267,13 @@ export function AIHelpPanel({ task, onClose }: Props) {
         </span>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={clearHistory}
+            className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded transition-colors hover:bg-muted"
+            style={{ color: 'var(--color-muted-foreground)' }}
+          >
+            Clear History
+          </button>
           <span
             className="text-[10px] font-mono px-2 py-0.5 rounded"
             style={{ background: 'color-mix(in oklab, var(--muted) 40%, transparent)', color: 'var(--color-muted-foreground)', border: '1px solid color-mix(in oklab, var(--border) 60%, transparent)' }}
