@@ -94,9 +94,13 @@ export function IncidentTable({ onSelect }: Props) {
           onClick={() => fetchIncidents()}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:brightness-110 active:scale-95 disabled:opacity-50"
-          style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+          style={{ 
+            background: 'color-mix(in oklab, var(--muted) 30%, transparent)', 
+            color: 'var(--color-foreground)', 
+            border: '1px solid var(--color-border)' 
+          }}
         >
-          <RotateCcw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RotateCcw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : 'text-primary'}`} style={loading ? {} : { color: 'var(--color-primary)' }} />
           Refresh
         </button>
       </div>
