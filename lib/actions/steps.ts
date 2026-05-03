@@ -14,6 +14,10 @@ export async function approveStep(stepId: string, reason?: string) {
   const { data: step } = await supabase.from('incident_steps').select('*').eq('id', stepId).single()
   if (!step) throw new Error('Step not found')
 
+  if (step.status !== 'WAITING_APPROVAL') {
+    throw new Error('This step is not currently waiting for approval')
+  }
+
   if (step.assigned_role) {
     const roleAuth = await requireAuth([step.assigned_role])
     if ('error' in roleAuth) throw new Error('Insufficient privileges to approve this step')
@@ -44,6 +48,10 @@ export async function rejectStep(stepId: string, reason: string) {
   const supabase = await createClient()
   const { data: step } = await supabase.from('incident_steps').select('*').eq('id', stepId).single()
   if (!step) throw new Error('Step not found')
+
+  if (step.status !== 'WAITING_APPROVAL') {
+    throw new Error('This step is not currently waiting for approval')
+  }
 
   if (step.assigned_role) {
     const roleAuth = await requireAuth([step.assigned_role])
