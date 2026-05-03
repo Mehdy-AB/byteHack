@@ -17,8 +17,26 @@ async function notifyStepAssignee(
 ) {
   const assignedUser = step.result?.assignedUser || step.assigned_user
   const assignedRole = step.result?.assignedRole || step.assigned_role
-  const subject = `[SF SOAR] Task Assigned: ${step.step_type.replace(/_/g, ' ')}`
-  const body = `You have a new ${step.step_type} task for incident "${incidentTitle}" (ID: ${incidentId}). ${step.result?.message || 'Please review in your SOAR dashboard.'}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const incidentLink = `${appUrl}/dashboard?incident=${incidentId}`
+  
+  const subject = `[SF SOAR] Action Required: ${step.step_type.replace(/_/g, ' ')}`
+  const body = `
+    <h2>New Task Assigned</h2>
+    <p>You have been assigned a <strong>${step.step_type}</strong> task for the following incident:</p>
+    <div style="padding: 15px; background: #f4f4f4; border-radius: 8px; margin: 15px 0;">
+      <strong>Incident:</strong> ${incidentTitle}<br/>
+      <strong>ID:</strong> ${incidentId}<br/>
+      <strong>Priority:</strong> ${step.result?.priorityLevel || 'MEDIUM'}
+    </div>
+    <p><strong>Instructions:</strong> ${step.result?.message || step.result?.catalogue || 'Please review and take action in the dashboard.'}</p>
+    <a href="${incidentLink}" style="display: inline-block; padding: 10px 20px; background: #007bff; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
+      View Incident in Dashboard
+    </a>
+    <p style="font-size: 12px; color: #666; margin-top: 20px;">
+      This is an automated notification from Silent Fracture SOAR.
+    </p>
+  `
 
   if (assignedUser) {
     const { data: profile } = await supabase
@@ -26,7 +44,11 @@ async function notifyStepAssignee(
       .select('email, notify_email')
       .eq('id', assignedUser)
       .single()
-    if (profile?.notify_email && profile?.email) {
+    
+    // Default to true if notify_email is not explicitly set to false
+    const shouldNotify = profile?.notify_email !== false
+    
+    if (shouldNotify && profile?.email) {
       await sendEmailNotification(profile.email, subject, body)
     }
     return
@@ -35,12 +57,20 @@ async function notifyStepAssignee(
   if (assignedRole) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('email')
+      .select('email, notify_email')
       .eq('role', assignedRole)
-      .eq('notify_email', true)
       .eq('is_active', true)
+    
     if (profiles?.length) {
-      await Promise.all(profiles.map((p: any) => sendEmailNotification(p.email, subject, body)))
+      const targetEmails = profiles
+        .filter(p => p.notify_email !== false && p.email)
+        .map(p => p.email)
+      
+      if (targetEmails.length > 0) {
+        await Promise.all(targetEmails.map((email: string) => 
+          sendEmailNotification(email, subject, body)
+        ))
+      }
     }
   }
 }
