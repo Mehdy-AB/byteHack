@@ -37,6 +37,7 @@ export function useAssistant({
       const userMsg: Message = { role: "user", content: text }
       setMessages((prev) => [...prev, userMsg])
       setIsStreaming(true)
+      let assistantText = ""
 
       let assistantText = ""
       try {
