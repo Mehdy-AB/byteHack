@@ -9,8 +9,9 @@ function getBase() {
 /** Load a session with its full message history */
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const auth = await requireAuth()
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
@@ -18,7 +19,7 @@ export async function GET(
   if (!base) return Response.json({ error: err }, { status: 503 })
 
   try {
-    const res = await fetch(`${base}/assist/sessions/${params.id}`)
+    const res = await fetch(`${base}/assist/sessions/${id}`)
     return Response.json(await res.json(), { status: res.status })
   } catch (e: any) {
     return Response.json({ error: `AI backend unreachable: ${e.message}` }, { status: 502 })
@@ -28,8 +29,9 @@ export async function GET(
 /** Rename a session */
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const auth = await requireAuth()
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
@@ -39,7 +41,7 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}))
 
   try {
-    const res = await fetch(`${base}/assist/sessions/${params.id}`, {
+    const res = await fetch(`${base}/assist/sessions/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -53,8 +55,9 @@ export async function PATCH(
 /** Delete a session (backend removes from Supabase and clears in-memory history) */
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const auth = await requireAuth()
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
@@ -62,7 +65,7 @@ export async function DELETE(
   if (!base) return Response.json({ error: err }, { status: 503 })
 
   try {
-    await fetch(`${base}/assist/sessions/${params.id}`, { method: 'DELETE' })
+    await fetch(`${base}/assist/sessions/${id}`, { method: 'DELETE' })
   } catch {
     // best-effort
   }
