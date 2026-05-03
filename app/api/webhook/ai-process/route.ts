@@ -1,89 +1,80 @@
 import { NextResponse } from 'next/server'
 import { initializeIncidentWorkflow } from '@/lib/workflow/init'
 import { WorkflowPayloadSchema } from '@/lib/workflow/schema'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Generic AI Processing Webhook
- * 
- * Flow: JSON Input -> AI Analysis -> Workflow Engine -> Persistence
- * 
- * This endpoint accepts raw JSON, sends it to the AI backend for playbook generation,
- * and then automatically initializes and executes the resulting SOAR workflow.
+ * Receives workflow JSON pushed by the Python RAG/AI backend (_send_to_friend).
+ * Validates, creates an incident, and starts the SOAR engine.
+ *
+ * Python error payloads ({ error: true }) are logged to audit_log and
+ * acknowledged with 200 — no incident is created for AI failures.
  */
 export async function POST(request: Request) {
+  let body: unknown
   try {
-    const inputJson = await request.json()
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-    if (!inputJson) {
-      return NextResponse.json({ error: 'No JSON payload provided' }, { status: 400 })
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Empty payload' }, { status: 400 })
+  }
+
+  const payload = body as Record<string, unknown>
+
+  // Python sends { error: true, ... } when workflow generation fails
+  if (payload.error === true) {
+    try {
+      const supabase = await createClient()
+      await supabase.from('audit_log').insert({
+        actor: 'PYTHON_AI_BACKEND',
+        action: 'AI_WORKFLOW_GENERATION_FAILED',
+        status: 'FAILED',
+        payload: {
+          incident_type: payload.incident_type ?? null,
+          summary: payload.summary ?? null,
+          retrieval: payload.retrieval ?? null,
+        },
+      })
+    } catch (logErr) {
+      console.error('[Webhook] Failed to log AI error to audit_log:', logErr)
     }
+    console.error('[Webhook] Python AI backend reported failure:', payload.summary)
+    return NextResponse.json({ received: true, status: 'error_logged' }, { status: 200 })
+  }
 
-    // 1. Forward to AI Analysis Engine
-    const backendUrl = process.env.BACKEND_API_URL
-    if (!backendUrl) {
-      console.error('BACKEND_API_URL is not configured.')
-      return NextResponse.json({ error: 'AI Backend not configured' }, { status: 500 })
-    }
+  // Validate as a workflow payload
+  const parsed = WorkflowPayloadSchema.safeParse(payload)
+  if (!parsed.success) {
+    console.error('[Webhook] Invalid workflow schema:', parsed.error.flatten())
+    return NextResponse.json(
+      { error: 'Invalid workflow schema', details: parsed.error.flatten() },
+      { status: 422 }
+    )
+  }
 
-    console.log(`[Webhook] Sending payload to AI: ${backendUrl}/analyze`)
-    
-    const aiResponse = await fetch(`${backendUrl}/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+  try {
+    const incident = await initializeIncidentWorkflow(parsed.data)
+    console.log(`[Webhook] Incident ${incident.id} created — ${parsed.data.steps.length} steps queued.`)
+    return NextResponse.json(
+      {
+        success: true,
+        incidentId: incident.id,
+        title: parsed.data.title,
+        severity: parsed.data.severity,
+        stepsCount: parsed.data.steps.length,
       },
-      body: JSON.stringify(inputJson),
-    })
-
-    if (!aiResponse.ok) {
-      console.error(`[Webhook] AI analysis failed with status: ${aiResponse.status}`)
-      return NextResponse.json({ error: 'AI analysis failed' }, { status: 502 })
-    }
-
-    const analysisData = await aiResponse.json()
-
-    // 2. Process AI recommended workflow
-    if (analysisData.workflow) {
-      console.log('[Webhook] AI recommended a workflow. Initializing SOAR engine...')
-      
-      const parsedWorkflow = WorkflowPayloadSchema.safeParse(analysisData.workflow)
-      
-      if (parsedWorkflow.success) {
-        const incident = await initializeIncidentWorkflow(parsedWorkflow.data)
-        console.log(`[Webhook] Incident ${incident.id} created and workflow started.`)
-        
-        return NextResponse.json({ 
-          success: true,
-          message: 'AI analyzed payload and initiated SOAR workflow', 
-          incidentId: incident.id,
-          analysis: {
-            summary: analysisData.summary,
-            type: analysisData.incident_type
-          }
-        }, { status: 201 })
-      } else {
-        console.error('[Webhook] AI generated an invalid workflow structure:', parsedWorkflow.error)
-        return NextResponse.json({ 
-          error: 'AI generated invalid workflow', 
-          details: parsedWorkflow.error.format() 
-        }, { status: 422 })
-      }
-    }
-
-    // 3. Fallback if AI didn't recommend a workflow
-    return NextResponse.json({ 
-      success: true,
-      message: 'AI analyzed the data but no automated actions were recommended.',
-      analysis: {
-        summary: analysisData.summary,
-        type: analysisData.incident_type
-      }
-    }, { status: 200 })
-    
-  } catch (error: any) {
-    console.error('[Webhook] Processing Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+      { status: 201 }
+    )
+  } catch (err: any) {
+    console.error('[Webhook] Workflow initialization failed:', err)
+    return NextResponse.json(
+      { error: err.message || 'Workflow initialization failed' },
+      { status: 500 }
+    )
   }
 }
